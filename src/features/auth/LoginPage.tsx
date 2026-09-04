@@ -16,6 +16,7 @@ import { TERMINAL_OPTIONS, useTerminal } from "@/hooks/useTerminal";
 import { toErrorMessage } from "@/lib/api/http";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import { DEMO_ACCOUNTS, DEMO_PASSWORD } from "@/services/auth.service";
+import { USE_MOCKS } from "@/lib/api/config";
 
 const loginSchema = z.object({
   username: z.string().trim().min(1, "Enter your username"),
@@ -176,7 +177,13 @@ export function LoginPage() {
           </form>
         </div>
 
-        {/* Development aid — removed once the Express API issues real accounts. */}
+        {/*
+          Only shown against the mock store. Once the Express API is issuing
+          real accounts these names and this password are wrong, and a sign-in
+          screen that advertises credentials which do not work is worse than
+          one that says nothing.
+        */}
+        {USE_MOCKS ? (
         <div className="mt-4 rounded-lg border border-dashed border-neutral-300 bg-white/60 p-3">
           <p className="text-micro font-semibold uppercase tracking-wide text-neutral-400">
             Demo accounts
@@ -197,6 +204,7 @@ export function LoginPage() {
             Password for all demo accounts: {DEMO_PASSWORD}
           </p>
         </div>
+        ) : null}
 
         <p className="mt-6 text-center text-micro text-neutral-400">
           Your Health, Our Priority

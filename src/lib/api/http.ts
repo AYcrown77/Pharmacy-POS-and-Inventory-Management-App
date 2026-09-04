@@ -128,22 +128,85 @@ export async function request<T>(
   }
 
   if (!response.ok) {
-    const error = (payload ?? {}) as {
-      message?: string;
-      code?: string;
-      fieldErrors?: FieldErrors;
-      details?: Record<string, unknown>;
-    };
-    throw new ApiError(
-      response.status,
-      error.message ?? `Request failed with status ${response.status}`,
-      error.code,
-      error.fieldErrors,
-      error.details,
+    throw toApiError(response.status, payload);
+  }
+
+  return unwrap<T>(payload);
+}
+
+/* -------------------------------------------------------------------------
+   The API envelope
+
+   Express wraps every response as `{ message, success, statusCode, data }`.
+   Services are written against the payload itself, so the envelope is opened
+   here — in one place — rather than in twenty adapters.
+   ------------------------------------------------------------------------- */
+
+interface ApiEnvelope {
+  message?: string;
+  success?: boolean;
+  statusCode?: number;
+  data?: unknown;
+}
+
+function isEnvelope(payload: unknown): payload is ApiEnvelope {
+  return (
+    typeof payload === "object" &&
+    payload !== null &&
+    "success" in payload &&
+    "data" in payload
+  );
+}
+
+function unwrap<T>(payload: unknown): T {
+  return (isEnvelope(payload) ? payload.data : payload) as T;
+}
+
+/** express-validator's 422 body, which does not use the envelope. */
+interface ValidationBody {
+  errors?: Array<{ path?: string; param?: string; msg?: string }>;
+}
+
+function toApiError(status: number, payload: unknown): ApiError {
+  const body = (payload ?? {}) as ApiEnvelope & ValidationBody;
+
+  // A validation failure comes back as a flat list of field errors. Mapping it
+  // to `fieldErrors` is what lets the forms mark the offending input rather
+  // than showing one generic message above everything.
+  if (Array.isArray(body.errors)) {
+    const fieldErrors: FieldErrors = {};
+    for (const entry of body.errors) {
+      const field = entry.path ?? entry.param;
+      if (field && entry.msg && !fieldErrors[field]) {
+        fieldErrors[field] = entry.msg;
+      }
+    }
+
+    const first = Object.values(fieldErrors)[0];
+    return new ApiError(
+      status,
+      first ?? "Please correct the highlighted fields.",
+      "VALIDATION_ERROR",
+      fieldErrors,
     );
   }
 
-  return payload as T;
+  // Business-rule failures carry their machine-readable code and any extra
+  // context (available stock, for instance) inside `data`.
+  const details =
+    typeof body.data === "object" && body.data !== null
+      ? (body.data as Record<string, unknown>)
+      : undefined;
+
+  const code = typeof details?.code === "string" ? details.code : undefined;
+
+  return new ApiError(
+    status,
+    body.message ?? `Request failed with status ${status}`,
+    code,
+    undefined,
+    details,
+  );
 }
 
 export const http = {
