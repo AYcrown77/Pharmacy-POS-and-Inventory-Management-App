@@ -1,0 +1,283 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   Mustan Healthcare Pharmacy — Design tokens
+   Colours sampled from the official logo:
+     navy   #012E75 (monogram) · #01255A (wordmark)
+     green  #1E8231 · #06682B
+   Tailwind v4 is CSS-first: this @theme block IS the config.
+   ========================================================================== */
+
+@theme {
+  /* -- Type ------------------------------------------------------------- */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, "Cascadia Mono",
+    Consolas, monospace;
+
+  --text-micro: 0.6875rem; /* 11px — uppercase labels */
+  --text-micro--line-height: 1rem;
+  --text-meta: 0.75rem; /* 12px — helper, meta */
+  --text-meta--line-height: 1rem;
+  --text-sm: 0.8125rem; /* 13px — dense table text */
+  --text-sm--line-height: 1.125rem;
+  --text-base: 0.875rem; /* 14px — body / forms / tables */
+  --text-base--line-height: 1.25rem;
+  --text-section: 0.9375rem; /* 15px — section headings */
+  --text-section--line-height: 1.25rem;
+  --text-title: 1.25rem; /* 20px — page titles */
+  --text-title--line-height: 1.75rem;
+  --text-stat: 1.5rem; /* 24px — stat values */
+  --text-stat--line-height: 2rem;
+  --text-total: 2rem; /* 32px — POS total */
+  --text-total--line-height: 2.375rem;
+
+  /* -- Primary · Brand Navy --------------------------------------------- */
+  --color-primary-50: #eef3fb;
+  --color-primary-100: #d9e5f6;
+  --color-primary-200: #b6cbeb;
+  --color-primary-300: #85a8db;
+  --color-primary-400: #4f80c6;
+  --color-primary-500: #2a5eab;
+  --color-primary-600: #12448b;
+  --color-primary-700: #012e75; /* logo monogram */
+  --color-primary-800: #01255a; /* logo wordmark */
+  --color-primary-900: #011c45;
+
+  /* -- Success · Pharmacy Green ------------------------------------------ */
+  --color-success-50: #edf7ef;
+  --color-success-100: #d3ecd8;
+  --color-success-200: #a8d9b3;
+  --color-success-300: #75c088;
+  --color-success-400: #45a55f;
+  --color-success-500: #268c42;
+  --color-success-600: #1e8231; /* logo green */
+  --color-success-700: #136b29;
+  --color-success-800: #0b5623;
+  --color-success-900: #083f1b;
+
+  /* -- Warning · Amber --------------------------------------------------- */
+  --color-warning-50: #fff8eb;
+  --color-warning-100: #fdecc8;
+  --color-warning-200: #fadb9c;
+  --color-warning-300: #f5c462;
+  --color-warning-400: #eaa42c;
+  --color-warning-500: #d9880b;
+  --color-warning-600: #b96c06;
+  --color-warning-700: #94540a;
+  --color-warning-800: #7a450e;
+
+  /* -- Danger · Red ------------------------------------------------------ */
+  --color-danger-50: #fef2f2;
+  --color-danger-100: #fde0e0;
+  --color-danger-200: #fbc5c5;
+  --color-danger-300: #f49a9a;
+  --color-danger-400: #ea6767;
+  --color-danger-500: #dc3b3b;
+  --color-danger-600: #c42626;
+  --color-danger-700: #a11d1d;
+  --color-danger-800: #851b1b;
+
+  /* -- Info · Sky (kept distinct from navy so it never reads as an action) */
+  --color-info-50: #eff8fe;
+  --color-info-100: #d8edfb;
+  --color-info-200: #b5dff8;
+  --color-info-300: #7ec9f3;
+  --color-info-500: #0b7fc7;
+  --color-info-600: #0967a6;
+  --color-info-700: #0b5486;
+
+  /* -- Neutral · Slate --------------------------------------------------- */
+  --color-neutral-0: #ffffff;
+  --color-neutral-50: #f6f8fa;
+  --color-neutral-100: #eceff3;
+  --color-neutral-200: #dfe3e9;
+  --color-neutral-300: #c9cfd8;
+  --color-neutral-400: #9ba3af;
+  --color-neutral-500: #6e7784;
+  --color-neutral-600: #545c68;
+  --color-neutral-700: #3d444e;
+  --color-neutral-800: #2a303a;
+  --color-neutral-900: #171b21;
+  --color-neutral-950: #0c0f13;
+
+  /* -- Semantic aliases — components reference THESE, not raw scales ----- */
+  --color-canvas: var(--color-neutral-50);
+  --color-surface: var(--color-neutral-0);
+  --color-surface-sunken: var(--color-neutral-100);
+  --color-border: var(--color-neutral-200);
+  --color-border-strong: var(--color-neutral-300);
+  --color-text: var(--color-neutral-900);
+  --color-text-muted: var(--color-neutral-500);
+  --color-text-subtle: var(--color-neutral-400);
+  --color-primary: var(--color-primary-700);
+  --color-primary-hover: var(--color-primary-800);
+  --color-focus-ring: var(--color-primary-400);
+
+  /* -- Radius (restrained — no oversized pills) -------------------------- */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  /* -- Shadows (exactly two, both subtle) -------------------------------- */
+  --shadow-card: 0 1px 2px 0 rgb(23 27 33 / 0.04),
+    0 0 0 1px rgb(23 27 33 / 0.04);
+  --shadow-overlay: 0 4px 6px -1px rgb(23 27 33 / 0.08),
+    0 10px 24px -4px rgb(23 27 33 / 0.12), 0 0 0 1px rgb(23 27 33 / 0.05);
+
+  /* -- Fixed control heights (consistency is the whole point) ------------ */
+  --spacing-control-sm: 2rem; /* 32px */
+  --spacing-control: 2.25rem; /* 36px */
+  --spacing-control-lg: 2.75rem; /* 44px */
+  --spacing-control-xl: 3.5rem; /* 56px */
+  --spacing-sidebar: 15.5rem; /* 248px */
+  --spacing-sidebar-collapsed: 4rem; /* 64px */
+  --spacing-topbar: 3.5rem; /* 56px */
+  --spacing-topbar-compact: 3rem; /* 48px */
+  --spacing-pos-panel: 22.5rem; /* 360px */
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: var(--text-base--line-height);
+  }
+
+  /* Visible focus everywhere. Never removed — only restyled. */
+  :focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  /* Money and quantities must not jitter as values change. */
+  th,
+  td,
+  input[type="number"] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Native date/number controls: match our control styling. */
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.55;
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+  }
+
+  ::placeholder {
+    color: var(--color-text-subtle);
+  }
+
+  /* Slim, unobtrusive scrollbars for the dense table views. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--color-neutral-300);
+    border: 2px solid transparent;
+    background-clip: content-box;
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-neutral-400);
+  }
+}
+
+/* ==========================================================================
+   Utilities
+   ========================================================================== */
+
+@utility num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* ==========================================================================
+   Print
+   Two shapes come out of this application: an 80mm till receipt and a
+   paper-size report. Both work by hiding the shell and revealing one subtree
+   marked `data-print-root`; the value says which shape it is.
+   ========================================================================== */
+
+/* Reports are the common case, so paper is the default page. A receipt
+   injects an 80mm `@page` override at print time — `@page` cannot be
+   selected on, so it cannot be expressed here. See `lib/print.ts`. */
+@page {
+  size: auto;
+  margin: 12mm;
+}
+
+@media print {
+  html,
+  body {
+    background: #fff;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Hide everything, then reveal only the subtree being printed. */
+  body * {
+    visibility: hidden;
+  }
+
+  [data-print-root],
+  [data-print-root] * {
+    visibility: visible;
+  }
+
+  [data-print-root] {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    margin: 0;
+  }
+
+  /* A till roll has its own width and no margin of its own. */
+  [data-print-root="receipt"] {
+    width: 80mm;
+    padding: 0;
+  }
+
+  /* Chrome, actions and anything else that must not reach the paper. */
+  [data-print-hidden] {
+    display: none !important;
+  }
+
+  /* Long report tables: never split a row, repeat the header on each page. */
+  tr,
+  li {
+    break-inside: avoid;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  /* Scroll containers must open out rather than clip at the paper edge. */
+  [data-print-root] .overflow-auto,
+  [data-print-root] .overflow-y-auto,
+  [data-print-root] .overflow-x-auto {
+    overflow: visible !important;
+  }
+}
