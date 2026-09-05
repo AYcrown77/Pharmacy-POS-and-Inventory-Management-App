@@ -34,6 +34,7 @@ import { reportsService } from "@/services/reports.service";
 import { useCashiers, useSales } from "@/features/sales/hooks";
 import type { DateRange } from "@/types/common";
 import type { PaymentMethod, Sale } from "@/types/domain";
+import { csvDateTime, csvMoney, csvNumber, exportCsv } from "@/lib/csv";
 import { ReportShell, ReportSummary } from "./components/ReportShell";
 
 const SalesTrendChart = dynamic(
@@ -152,6 +153,25 @@ export function SalesReportPage() {
 
   return (
     <ReportShell
+      onExport={() =>
+        exportCsv(
+          "sales report",
+          [
+            { header: "Receipt", value: (s) => s.receiptNumber },
+            { header: "Date", value: (s) => csvDateTime(s.createdAt) },
+            { header: "Cashier", value: (s) => s.cashierName },
+            { header: "Terminal", value: (s) => s.terminalName },
+            { header: "Items", value: (s) => csvNumber(s.items.length) },
+            { header: "Payment", value: (s) => s.paymentMethod },
+            { header: "Status", value: (s) => s.status },
+            { header: "Subtotal", value: (s) => csvMoney(s.subtotal) },
+            { header: "Discount", value: (s) => csvMoney(s.discount) },
+            { header: "Total", value: (s) => csvMoney(s.total) },
+          ],
+          sales.data?.data ?? [],
+          range,
+        )
+      }
       title="Sales report"
       description="Takings for the selected period, and how they were paid."
       range={range}

@@ -34,6 +34,7 @@ import { inventoryService } from "@/services/inventory.service";
 import { reportsService } from "@/services/reports.service";
 import type { DateRange } from "@/types/common";
 import type { MovementType, StockMovement } from "@/types/domain";
+import { csvDateTime, csvNumber, exportCsv } from "@/lib/csv";
 import { ReportShell, ReportSummary } from "./components/ReportShell";
 
 const MOVEMENT_TYPES: MovementType[] = [
@@ -167,6 +168,25 @@ export function StockMovementReportPage() {
 
   return (
     <ReportShell
+      onExport={() =>
+        exportCsv(
+          "stock movements",
+          [
+            { header: "Date", value: (m) => csvDateTime(m.createdAt) },
+            { header: "Product", value: (m) => m.productName },
+            { header: "Batch", value: (m) => m.batchNumber },
+            { header: "Type", value: (m) => m.movementType },
+            { header: "Change", value: (m) => csvNumber(m.quantity) },
+            { header: "Previous", value: (m) => csvNumber(m.previousQuantity) },
+            { header: "New", value: (m) => csvNumber(m.newQuantity) },
+            { header: "Reference", value: (m) => m.referenceType },
+            { header: "User", value: (m) => m.userName },
+            { header: "Reason", value: (m) => m.reason },
+          ],
+          list.data?.data ?? [],
+          range,
+        )
+      }
       title="Stock movement report"
       description="Exactly how inventory entered and left the pharmacy."
       range={range}

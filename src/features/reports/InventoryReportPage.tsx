@@ -23,6 +23,7 @@ import { STOCK_STATUS_LABELS } from "@/lib/status";
 import { inventoryService } from "@/services/inventory.service";
 import { useCategories } from "@/features/products/hooks";
 import type { InventoryItem, StockStatus } from "@/types/domain";
+import { csvDate, csvMoney, csvNumber, exportCsv } from "@/lib/csv";
 import { ReportShell, ReportSummary } from "./components/ReportShell";
 
 export function InventoryReportPage() {
@@ -133,6 +134,22 @@ export function InventoryReportPage() {
 
   return (
     <ReportShell
+      onExport={() =>
+        exportCsv("inventory report", [
+          { header: "Product", value: (i) => i.product.name },
+          { header: "Generic name", value: (i) => i.product.genericName },
+          { header: "Category", value: (i) => i.product.category?.name },
+          { header: "Barcode", value: (i) => i.product.barcode },
+          { header: "Available", value: (i) => csvNumber(i.availableStock) },
+          { header: "Minimum", value: (i) => csvNumber(i.minimumStockLevel) },
+          { header: "Batches", value: (i) => csvNumber(i.batchCount) },
+          { header: "Stock status", value: (i) => i.stockStatus },
+          { header: "Nearest expiry", value: (i) => csvDate(i.nearestExpiry) },
+          { header: "Expiry status", value: (i) => i.expiryStatus },
+          { header: "Unit price", value: (i) => csvMoney(i.product.sellingPrice) },
+          { header: "Stock value", value: (i) => csvMoney(i.stockValue) },
+        ], list.data?.data ?? [])
+      }
       title="Inventory report"
       description="Stock on hand and its value across the catalogue."
       filters={

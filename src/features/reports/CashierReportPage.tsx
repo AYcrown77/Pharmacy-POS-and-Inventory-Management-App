@@ -20,6 +20,7 @@ import { reportKeys } from "@/lib/query/keys";
 import { reportsService } from "@/services/reports.service";
 import type { CashierReportRow } from "@/types/analytics";
 import type { DateRange } from "@/types/common";
+import { csvMoney, csvNumber, exportCsv } from "@/lib/csv";
 import { ReportShell, ReportSummary } from "./components/ReportShell";
 
 /**
@@ -135,6 +136,22 @@ export function CashierReportPage() {
 
   return (
     <ReportShell
+      onExport={() =>
+        exportCsv(
+          "cashier report",
+          [
+            { header: "Cashier", value: (c) => c.cashierName },
+            { header: "Transactions", value: (c) => csvNumber(c.transactions) },
+            { header: "Cash", value: (c) => csvMoney(c.cashSales) },
+            { header: "POS / Card", value: (c) => csvMoney(c.cardSales) },
+            { header: "Transfer", value: (c) => csvMoney(c.transferSales) },
+            { header: "Total", value: (c) => csvMoney(c.totalSales) },
+            { header: "Average sale", value: (c) => csvMoney(c.averageSale) },
+          ],
+          report.data ?? [],
+          range,
+        )
+      }
       title="Cashier report"
       description="Takings per cashier, split by payment method."
       range={range}

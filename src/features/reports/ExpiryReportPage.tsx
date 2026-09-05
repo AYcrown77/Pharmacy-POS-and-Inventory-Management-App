@@ -27,6 +27,7 @@ import { inventoryService } from "@/services/inventory.service";
 import { useCategories } from "@/features/products/hooks";
 import type { ExpiryAlertItem } from "@/types/analytics";
 import type { ExpiryStatus } from "@/types/domain";
+import { csvDate, csvMoney, csvNumber, exportCsv } from "@/lib/csv";
 import { ReportShell, ReportSummary } from "./components/ReportShell";
 
 export function ExpiryReportPage() {
@@ -145,6 +146,17 @@ export function ExpiryReportPage() {
 
   return (
     <ReportShell
+      onExport={() =>
+        exportCsv("expiry report", [
+          { header: "Product", value: (b) => b.productName },
+          { header: "Batch", value: (b) => b.batchNumber },
+          { header: "Remaining", value: (b) => csvNumber(b.quantityRemaining) },
+          { header: "Expiry date", value: (b) => csvDate(b.expiryDate) },
+          { header: "Days until expiry", value: (b) => csvNumber(b.daysUntilExpiry) },
+          { header: "Status", value: (b) => b.expiryStatus },
+          { header: "Stock value", value: (b) => csvMoney(b.stockValue) },
+        ], list.data?.data ?? [])
+      }
       title="Expiry report"
       description="Batches by remaining shelf life, soonest first."
       filters={
@@ -201,14 +213,6 @@ export function ExpiryReportPage() {
                       ? undefined
                       : ("warning" as const),
                 accent: (summary.data?.[status] ?? 0) > 0,
-                // Each band is also the filter for that band. Pressing the
-                // selected one again clears it, so the tiles are the whole
-                // control rather than something to undo in the dropdown.
-                selected: expiryStatus === status,
-                onSelect: () =>
-                  setExpiryStatus((current) =>
-                    current === status ? undefined : status,
-                  ),
               })),
               {
                 label: "Value at risk",
