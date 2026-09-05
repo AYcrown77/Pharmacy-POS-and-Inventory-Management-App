@@ -1,12 +1,13 @@
 "use client";
 
 import { Download, Printer } from "lucide-react";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { PageContainer, PageHeader } from "@/components/ui/PageHeader";
 import { StatCard, StatCardSkeleton } from "@/components/ui/StatCard";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { cn } from "@/lib/cn";
 import { formatDate } from "@/lib/date";
 import { printReport } from "@/lib/print";
 import { usePharmacySettings } from "@/features/sales/hooks";
@@ -108,6 +109,13 @@ export function ReportSummary({
     context?: string;
     tone?: "warning" | "danger";
     accent?: boolean;
+    /**
+     * Turns the tile into a filter chip. Reports whose summary bands are also
+     * the useful filters — expiry, above all — read as clickable whether or
+     * not they are, so a tile that does nothing when pressed reads as broken.
+     */
+    onSelect?: () => void;
+    selected?: boolean;
   }>;
   isPending?: boolean;
   columns?: 3 | 4 | 5 | 6;
@@ -131,17 +139,39 @@ export function ReportSummary({
 
   return (
     <div className={`grid gap-3 ${gridClass}`}>
-      {items.map((item) => (
-        <StatCard
-          key={item.label}
-          size="sm"
-          label={item.label}
-          value={item.value}
-          context={item.context}
-          tone={item.tone}
-          accent={item.accent}
-        />
-      ))}
+      {items.map((item) => {
+        const card = (
+          <StatCard
+            size="sm"
+            label={item.label}
+            value={item.value}
+            context={item.context}
+            tone={item.tone}
+            accent={item.accent}
+          />
+        );
+
+        if (!item.onSelect) return <Fragment key={item.label}>{card}</Fragment>;
+
+        return (
+          <button
+            key={item.label}
+            type="button"
+            onClick={item.onSelect}
+            // A toggle rather than a link: pressing it again clears the filter.
+            aria-pressed={item.selected}
+            className={cn(
+              "rounded-lg text-left transition",
+              "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-400",
+              item.selected
+                ? "ring-2 ring-primary-600 ring-offset-1"
+                : "hover:ring-2 hover:ring-neutral-300",
+            )}
+          >
+            {card}
+          </button>
+        );
+      })}
     </div>
   );
 }

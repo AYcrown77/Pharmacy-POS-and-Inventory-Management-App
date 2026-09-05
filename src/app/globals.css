@@ -232,14 +232,33 @@
 
 /* ==========================================================================
    Print
-   Two shapes come out of this application: an 80mm till receipt and a
-   paper-size report. Both work by hiding the shell and revealing one subtree
-   marked `data-print-root`; the value says which shape it is.
+   Two shapes come out of this application: a till receipt and a paper-size
+   report. Both work by hiding the shell and revealing one subtree marked
+   `data-print-root`; the value says which shape it is.
    ========================================================================== */
 
-/* Reports are the common case, so paper is the default page. A receipt
-   injects an 80mm `@page` override at print time — `@page` cannot be
-   selected on, so it cannot be expressed here. See `lib/print.ts`. */
+/* ---------------------------------------------------------------------------
+   Receipt calibration — the only two numbers you should ever need to change.
+
+   Thermal paper is wider than the area the printer can actually mark. An 80mm
+   unit — the Xprinter on the counter — is 576 dots at 203dpi, which is 72mm of
+   printable width; the remaining 8mm is dead margin the head never reaches.
+   Setting the page to the paper and the content to the printable area is what
+   stops the money column being sheared off the right-hand edge.
+
+   The receipt is centred on the roll. If the print comes out clipped, reduce
+   --receipt-width a millimetre at a time; if it sits off-centre, nudge it with
+   --receipt-inset (negative moves it left).
+   --------------------------------------------------------------------------- */
+:root {
+  --receipt-paper: 80mm; /* the roll you buy */
+  --receipt-width: 72mm; /* what the head can actually mark */
+  --receipt-inset: 0mm; /* nudge off centre; negative moves left */
+}
+
+/* Reports are the common case, so paper is the default page. A receipt injects
+   its own `@page` override at print time — `@page` cannot be selected on, so
+   it cannot be expressed here. See `lib/print.ts`. */
 @page {
   size: auto;
   margin: 12mm;
@@ -271,9 +290,18 @@
   }
 
   /* A till roll has its own width and no margin of its own. */
-  [data-print-root="receipt"] {
-    width: 80mm;
+  [data-print-root="receipt"],
+  [data-print-root="labels"] {
+    width: var(--receipt-width);
     padding: 0;
+
+    /* Centred on the roll rather than pinned to the left edge. An absolutely
+       positioned box needs both edges pinned before auto margins can balance
+       it, hence `right: 0` alongside the inherited `left: 0`. The inset then
+       nudges away from centre rather than in from the edge. */
+    right: 0;
+    margin-inline: auto;
+    transform: translateX(var(--receipt-inset));
   }
 
   /* Chrome, actions and anything else that must not reach the paper. */

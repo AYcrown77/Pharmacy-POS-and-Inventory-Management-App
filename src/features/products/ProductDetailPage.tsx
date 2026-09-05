@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { PackagePlus, Pencil } from "lucide-react";
+import { PackagePlus, Pencil, Tag } from "lucide-react";
 import { useState } from "react";
 
 import { Badge } from "@/components/ui/Badge";
@@ -11,6 +11,7 @@ import { SkeletonCard } from "@/components/ui/Skeleton";
 import { ErrorState } from "@/components/ui/States";
 import { TabPanel, Tabs } from "@/components/ui/Tabs";
 import { Can } from "@/lib/auth/AuthProvider";
+import { PrintLabelDialog } from "./components/PrintLabelDialog";
 import {
   ProductBatchesTab,
   ProductMovementsTab,
@@ -28,6 +29,7 @@ type TabValue = "overview" | "batches" | "movements" | "sales";
 
 export function ProductDetailPage({ productId }: { productId: string }) {
   const [tab, setTab] = useState<TabValue>("overview");
+  const [labelsOpen, setLabelsOpen] = useState(false);
 
   const product = useProduct(productId);
   const batches = useProductBatches(productId);
@@ -73,6 +75,13 @@ export function ProductDetailPage({ productId }: { productId: string }) {
         actions={
           <>
             {!data.isActive && <Badge tone="neutral">Inactive</Badge>}
+            <Button
+              variant="secondary"
+              leadingIcon={<Tag className="size-4" />}
+              onClick={() => setLabelsOpen(true)}
+            >
+              Print label
+            </Button>
             <Can permission="stock:receive">
               <Button
                 asChild
@@ -152,6 +161,12 @@ export function ProductDetailPage({ productId }: { productId: string }) {
           />
         </TabPanel>
       </Tabs>
+
+      <PrintLabelDialog
+        product={data}
+        open={labelsOpen}
+        onOpenChange={setLabelsOpen}
+      />
     </PageContainer>
   );
 }

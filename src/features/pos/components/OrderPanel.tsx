@@ -152,9 +152,9 @@ export function OrderPanel({
           onClick={onComplete}
           className="justify-between"
         >
-          <span>Complete sale</span>
+          <span className="text-white">Complete sale</span>
           {!processing && (
-            <span className="num rounded-sm bg-white/15 px-1.5 py-0.5 text-micro font-semibold">
+            <span className="num rounded-sm bg-white/15 px-1.5 py-0.5 text-micro font-semibold text-white">
               F9
             </span>
           )}

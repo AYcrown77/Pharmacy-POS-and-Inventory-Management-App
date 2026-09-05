@@ -7,7 +7,24 @@
  * `globals.css`.
  */
 
-const RECEIPT_PAGE_RULE = "@page { size: 80mm auto; margin: 0; }";
+/** Falls back to the 58mm roll if the stylesheet has not loaded yet. */
+const DEFAULT_RECEIPT_PAPER = "58mm";
+
+/**
+ * The page is the paper; the content is the narrower printable area.
+ *
+ * Custom properties do not resolve inside `@page` — it sits outside the
+ * cascade — so the width is read from `:root` here and written into the rule.
+ * That keeps `--receipt-paper` in `globals.css` the single place to change it.
+ */
+function receiptPageRule(): string {
+  const paper =
+    getComputedStyle(document.documentElement)
+      .getPropertyValue("--receipt-paper")
+      .trim() || DEFAULT_RECEIPT_PAPER;
+
+  return `@page { size: ${paper} auto; margin: 0; }`;
+}
 
 function printWithPageRule(rule: string | null) {
   if (typeof window === "undefined") return;
@@ -32,12 +49,23 @@ function printWithPageRule(rule: string | null) {
   window.print();
 }
 
-/** Print the 80mm receipt currently mounted on the page. */
+/** Print the till receipt currently mounted on the page. */
 export function printReceipt() {
-  printWithPageRule(RECEIPT_PAGE_RULE);
+  printWithPageRule(receiptPageRule());
 }
 
 /** Print the report subtree at the paper size configured in the browser. */
 export function printReport() {
   printWithPageRule(null);
+}
+
+/**
+ * Print a strip of product labels.
+ *
+ * Same roll as the receipt, so the same page rule — the labels are separated
+ * by a cut line rather than by page breaks, because the printer feeds a
+ * continuous roll and has no notion of a page.
+ */
+export function printLabels() {
+  printWithPageRule(receiptPageRule());
 }

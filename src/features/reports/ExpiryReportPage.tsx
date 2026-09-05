@@ -201,6 +201,14 @@ export function ExpiryReportPage() {
                       ? undefined
                       : ("warning" as const),
                 accent: (summary.data?.[status] ?? 0) > 0,
+                // Each band is also the filter for that band. Pressing the
+                // selected one again clears it, so the tiles are the whole
+                // control rather than something to undo in the dropdown.
+                selected: expiryStatus === status,
+                onSelect: () =>
+                  setExpiryStatus((current) =>
+                    current === status ? undefined : status,
+                  ),
               })),
               {
                 label: "Value at risk",

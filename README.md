@@ -92,6 +92,53 @@ src/
 
 ---
 
+## Printer setup (per terminal)
+
+The receipt is rendered by the browser and rasterised by Chrome, so the printer
+needs no special support from the app — but it does need four things set on the
+machine, and getting any of them wrong sends receipts to a PDF instead of the
+roll.
+
+**1. Give the driver an 80mm paper size.** This is the one people miss. Windows
+printers default to A4; Chrome then letterboxes the 80mm receipt into the
+corner of an A4 page. In *Printers & scanners → Xprinter → Printing
+preferences*, set the paper to the 80mm roll size. The Xprinter driver usually
+lists it as **80(72.1) × 297mm** — that 72.1 is the printable width, and it is
+why `--receipt-width` in `globals.css` is 72mm.
+
+**2. Make it the Windows default printer**, and turn **off** *Let Windows manage
+my default printer* in *Printers & scanners*. Left on, Windows quietly promotes
+whatever was last used — print one PDF and every receipt after it goes to PDF.
+
+**3. Set Chrome's print options once.** Open a receipt, press Print, and in the
+dialog set Destination to the Xprinter, **Margins: None**, **Scale: 100%** (not
+"Fit to printable area"), and clear **Headers and footers**. Chrome remembers
+these per destination.
+
+**4. Turn off the print dialog** so a sale does not need three clicks. Launch
+Chrome with `--kiosk-printing`; `window.print()` then goes straight to the
+default printer with no dialog:
+
+```
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --kiosk-printing --app=http://<server>:3000
+```
+
+Two things about that flag. It only applies to a **cold** start — if any Chrome
+window is already open the flag is ignored, because the new process just hands
+off to the running one. Close every Chrome window first. And because it prints
+to the **default** printer without asking, step 2 is what stops it silently
+producing PDFs.
+
+> **Seeing a "Save Print Output As" dialog?** That is Chrome's destination set
+> to *Save as PDF*, not a fault in the app. Work back through steps 2 and 3.
+
+### Calibrating
+
+If the print is clipped on the right, lower `--receipt-width` in
+`src/app/globals.css` a millimetre at a time. If it sits too far left, raise
+`--receipt-inset`. Those two values also size the product labels, since they
+come off the same roll.
+
 ## Checks
 
 ```bash
