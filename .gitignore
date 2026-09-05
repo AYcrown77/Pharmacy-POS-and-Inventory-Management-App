@@ -30,8 +30,11 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files. The real ones hold secrets and stay out of git, but the example
+# must be committed — a fresh clone has nothing to copy from otherwise, and
+# the app then silently falls back to the mock data store.
 .env*
+!.env.example
 
 # vercel
 .vercel
