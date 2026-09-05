@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@import "@fontsource-variable/inter/wght.css";
+@import "@fontsource-variable/jetbrains-mono/wght.css";
 
 /* ==========================================================================
    Mustan Healthcare Pharmacy — Design tokens
@@ -8,11 +10,26 @@
    Tailwind v4 is CSS-first: this @theme block IS the config.
    ========================================================================== */
 
+/*
+ * Fonts are self-hosted from npm rather than fetched from Google.
+ *
+ * Two reasons, both specific to this deployment. The pharmacy server has no
+ * internet, and `next/font/google` downloads at BUILD time — so a build on an
+ * offline machine silently substitutes a system font with only a warning.
+ *
+ * More importantly, the naira sign lives at U+20A6, which Inter ships in its
+ * `latin-ext` subset, not `latin`. Requesting only `latin` left every "₦" in
+ * the application — the 80mm receipt included — being drawn by whatever
+ * fallback the machine happened to pick, at a width that does not match the
+ * tabular digits beside it. These stylesheets carry every subset with its
+ * unicode-range, so the browser fetches latin-ext exactly when it meets a ₦.
+ */
+
 @theme {
   /* -- Type ------------------------------------------------------------- */
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system,
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", Roboto, sans-serif;
-  --font-mono: var(--font-jetbrains-mono), ui-monospace, "Cascadia Mono",
+  --font-mono: "JetBrains Mono Variable", ui-monospace, "Cascadia Mono",
     Consolas, monospace;
 
   --text-micro: 0.6875rem; /* 11px — uppercase labels */

@@ -33,13 +33,6 @@ export const TERMINAL_OPTIONS: TerminalOption[] = [
     type: "CHECKOUT",
   },
   {
-    id: "trm-02",
-    name: "Dispensing Terminal",
-    shortName: "T02",
-    location: "Dispensary",
-    type: "DISPENSING",
-  },
-  {
     id: "trm-03",
     name: "Admin Terminal",
     shortName: "T03",
@@ -80,11 +73,17 @@ function getServerSnapshot(): string {
 }
 
 export function useTerminal() {
-  const terminalId = useSyncExternalStore(
+  const storedId = useSyncExternalStore(
     subscribe,
     getSnapshot,
     getServerSnapshot,
   );
+
+  // A machine that was set up as a terminal since retired still has that id in
+  // its browser storage. Resolving through `findTerminal` first means the id
+  // sent with a sale is always one that still exists, rather than the stale
+  // value while the badge shows the fallback.
+  const terminal = findTerminal(storedId);
 
   const setTerminalId = useCallback((id: string) => {
     try {
@@ -96,8 +95,8 @@ export function useTerminal() {
   }, []);
 
   return {
-    terminalId,
-    terminal: findTerminal(terminalId),
+    terminalId: terminal.id,
+    terminal,
     setTerminalId,
   };
 }
