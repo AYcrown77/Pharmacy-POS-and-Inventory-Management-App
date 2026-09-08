@@ -171,6 +171,9 @@ export function PosTerminal() {
     setQuery("");
     setNotice(null);
     setPaymentMethod("CASH");
+    // Back to a walk-in. Carrying the last customer over is how the next
+    // person's shopping quietly lands on someone else's account.
+    setCustomer(null);
     focusScan();
   }
 
@@ -307,6 +310,7 @@ export function PosTerminal() {
         onPaymentMethodChange={setPaymentMethod}
         onClear={() => {
           cart.dispatch({ type: "CLEAR" });
+          setCustomer(null);
           focusScan();
         }}
         onComplete={() => setPayingOpen(true)}

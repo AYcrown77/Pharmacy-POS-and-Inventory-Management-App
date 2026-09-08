@@ -51,11 +51,12 @@ export function CompleteSaleDialog({
   // are settled on the bank's terminal before the cashier gets here.
   // A shortfall is only payable if there is an account to bill it to. A
   // walk-in who cannot pay in full has to put something back.
+  // Every method asks what was actually paid, card and transfer included: a
+  // transfer can come up short just as a handful of notes can, and the till
+  // cannot put the difference on an account it was never told about.
   const canConfirm = processing
     ? false
-    : isCash
-      ? receivedKobo !== null && (receivedKobo >= total || customer !== null)
-      : true;
+    : receivedKobo !== null && (receivedKobo >= total || customer !== null);
 
   /** What this payment will do to the customer's balance. */
   const debtEffect = (() => {
@@ -107,7 +108,7 @@ export function CompleteSaleDialog({
             variant="primary"
             loading={processing}
             disabled={!canConfirm}
-            onClick={() => onConfirm(isCash ? receivedKobo : null)}
+            onClick={() => onConfirm(receivedKobo)}
           >
             Confirm sale
           </Button>
@@ -136,13 +137,12 @@ export function CompleteSaleDialog({
           </p>
         </div>
 
-        {isCash ? (
-          <div className="flex flex-col gap-2.5">
+        <div className="flex flex-col gap-2.5">
             <label
               htmlFor="amount-received"
               className="text-meta font-medium text-neutral-700"
             >
-              Amount received
+              {isCash ? "Amount received" : "Amount paid"}
             </label>
 
             <input
@@ -175,9 +175,8 @@ export function CompleteSaleDialog({
               >
                 Exact
               </button>
-              {QUICK_TENDER_NAIRA.filter(
-                (naira) => nairaToKobo(naira) >= total,
-              )
+              {(isCash ? QUICK_TENDER_NAIRA : [])
+                .filter((naira) => nairaToKobo(naira) >= total)
                 .slice(0, 4)
                 .map((naira) => (
                   <button
@@ -268,14 +267,15 @@ export function CompleteSaleDialog({
                     : "—"}
               </span>
             </div>
+
+            {!isCash && (
+              <p className="text-meta text-neutral-500">
+                Confirm the payment cleared on the{" "}
+                {paymentMethod === "CARD" ? "card terminal" : "bank transfer"}{" "}
+                before completing this sale.
+              </p>
+            )}
           </div>
-        ) : (
-          <p className="text-base text-neutral-600">
-            Confirm the payment has gone through on the{" "}
-            {paymentMethod === "CARD" ? "card terminal" : "bank transfer"}{" "}
-            before completing this sale.
-          </p>
-        )}
       </div>
     </Modal>
   );

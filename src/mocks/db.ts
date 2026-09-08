@@ -210,6 +210,7 @@ function seedDatabase(): Database {
     priceWholesale: seed.priceWholesale,
     priceRetail: seed.priceRetail,
     priceConsumer: seed.priceConsumer,
+    unitsPerPack: seed.unitsPerPack ?? 1,
     minimumStockLevel: seed.minimumStockLevel,
     unitType: seed.unitType,
     isActive: seed.isActive,
@@ -378,6 +379,7 @@ function seedSalesHistory(database: Database) {
           batchId: batch.id,
           batchNumber: batch.batchNumber,
           quantity,
+          unitsPerSaleUnit: 1,
           unitPrice,
           subtotal: unitPrice * quantity,
           returnedQuantity: 0,
@@ -737,6 +739,7 @@ export function completeSale(input: CompleteSaleInput): Sale {
         quantity: allocation.quantity,
         // Price at the moment of sale — a later price change must not
         // rewrite this receipt.
+        unitsPerSaleUnit: 1,
         unitPrice: product.priceConsumer,
         subtotal: product.priceConsumer * allocation.quantity,
         returnedQuantity: 0,

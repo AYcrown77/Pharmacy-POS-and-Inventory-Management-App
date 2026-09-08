@@ -39,6 +39,7 @@ export interface ProductInput {
   priceWholesale: Money;
   priceRetail: Money;
   priceConsumer: Money;
+  unitsPerPack: number;
   minimumStockLevel: number;
   unitType: UnitType;
   isActive: boolean;

@@ -74,6 +74,16 @@ export const productSchema = z.object({
     .positive("The consumer price must be greater than zero")
     .max(10_000_000, "That price looks too high — check the amount"),
 
+  /**
+   * Retail and wholesale are priced per pack, so this is what turns a pack
+   * price into a stock movement. 1 for anything sold whole.
+   */
+  unitsPerPack: z
+    .number({ error: "Enter how many units are in a pack" })
+    .int("Use a whole number")
+    .min(1, "Use 1 for products that are not broken down")
+    .max(10_000, "That pack size looks too large"),
+
   minimumStockLevel: z
     .number({ error: "Enter a minimum stock level" })
     .int("Use a whole number of units")

@@ -26,6 +26,19 @@ export type PaymentMethod = "CASH" | "CARD" | "TRANSFER";
  */
 export type PriceTier = "WHOLESALE" | "RETAIL" | "CONSUMER";
 
+/**
+ * Which unit a tier trades in.
+ *
+ * A walk-in buys a single; a shop or distributor buys the pack. The tier
+ * decides both the price and what "1" means, so the two cannot drift apart.
+ * Stock is always counted in singles — a pack sale just deducts more of them.
+ */
+export const TIER_SELLS_PACKS: Record<PriceTier, boolean> = {
+  WHOLESALE: true,
+  RETAIL: true,
+  CONSUMER: false,
+};
+
 export type SaleStatus = "COMPLETED" | "PARTIALLY_RETURNED" | "REVERSED";
 
 export type StockStatus = "IN_STOCK" | "LOW_STOCK" | "OUT_OF_STOCK";
@@ -129,6 +142,12 @@ export interface Product {
   priceWholesale: Money;
   priceRetail: Money;
   priceConsumer: Money;
+  /**
+   * How many of the smallest unit make up one pack. 1 means the product is
+   * never broken down — a bottle, an inhaler — and pack and single are then
+   * the same thing.
+   */
+  unitsPerPack: number;
   minimumStockLevel: number;
   unitType: UnitType;
   isActive: boolean;
@@ -229,6 +248,8 @@ export interface SaleItem {
   batchId: string;
   batchNumber: string;
   quantity: number;
+  /** Base units in one of this line's units — the pack size, or 1. */
+  unitsPerSaleUnit: number;
   unitPrice: Money;
   subtotal: Money;
   returnedQuantity: number;

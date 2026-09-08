@@ -73,6 +73,7 @@ export function ProductForm({
           priceWholesale: koboToNaira(product.priceWholesale),
           priceRetail: koboToNaira(product.priceRetail),
           priceConsumer: koboToNaira(product.priceConsumer),
+          unitsPerPack: product.unitsPerPack,
           minimumStockLevel: product.minimumStockLevel,
           unitType: product.unitType,
           isActive: product.isActive,
@@ -88,6 +89,7 @@ export function ProductForm({
           priceWholesale: undefined,
           priceRetail: undefined,
           priceConsumer: undefined,
+          unitsPerPack: 1,
           minimumStockLevel: 10,
           unitType: "PACK",
           isActive: true,
@@ -156,6 +158,7 @@ export function ProductForm({
       priceWholesale: nairaToKobo(parsed.priceWholesale),
       priceRetail: nairaToKobo(parsed.priceRetail),
       priceConsumer: nairaToKobo(parsed.priceConsumer),
+      unitsPerPack: parsed.unitsPerPack,
       minimumStockLevel: parsed.minimumStockLevel,
       unitType: parsed.unitType,
       isActive: parsed.isActive,
@@ -332,9 +335,9 @@ export function ProductForm({
                   trade buyers pay. */}
               {(
                 [
-                  ["priceWholesale", "Wholesale price", "Distributors and bulk buyers."],
-                  ["priceRetail", "Retail price", "Shops buying to resell."],
-                  ["priceConsumer", "Consumer price", "Walk-in customers. Used by default at the till."],
+                  ["priceWholesale", "Wholesale price (per pack)", "Distributors and bulk buyers."],
+                  ["priceRetail", "Retail price (per pack)", "Shops buying to resell."],
+                  ["priceConsumer", "Consumer price (each)", "Walk-in customers. Charged per single unit."],
                 ] as const
               ).map(([field, label, hint]) => (
                 <FormField
@@ -358,6 +361,25 @@ export function ProductForm({
                   )}
                 </FormField>
               ))}
+
+              <FormField
+                label="Units per pack"
+                error={errors.unitsPerPack?.message}
+                required
+                hint="How many singles are in a pack. Use 1 if it is sold whole."
+              >
+                {(ids) => (
+                  <Input
+                    {...ids}
+                    {...register("unitsPerPack", { valueAsNumber: true })}
+                    type="number"
+                    step="1"
+                    min="1"
+                    inputMode="numeric"
+                    className="num"
+                  />
+                )}
+              </FormField>
 
               <FormField
                 label="Minimum stock level"

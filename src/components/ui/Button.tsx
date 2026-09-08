@@ -15,17 +15,24 @@ export type ButtonVariant =
 
 export type ButtonSize = "sm" | "md" | "lg" | "xl";
 
+/*
+ * Anything clickable is blue; grey is reserved for things that are not.
+ *
+ * Secondary and ghost buttons previously read as neutral chrome, which made
+ * real actions — Export, Scan, Statement — look like labels. Tinting them
+ * brand blue keeps one rule the eye can follow: blue means you can press it.
+ */
 const VARIANTS: Record<ButtonVariant, string> = {
   primary:
     "bg-primary-700 text-white hover:bg-primary-800 active:bg-primary-900 disabled:bg-primary-700",
   secondary:
-    "bg-white text-neutral-800 ring-1 ring-inset ring-neutral-300 hover:bg-neutral-50 active:bg-neutral-100",
+    "bg-white text-primary-700 ring-1 ring-inset ring-primary-300 hover:bg-primary-50 active:bg-primary-100",
   ghost:
-    "bg-transparent text-neutral-700 hover:bg-neutral-100 active:bg-neutral-200",
+    "bg-transparent text-primary-700 hover:bg-primary-50 active:bg-primary-100",
   danger:
     "bg-danger-600 text-white hover:bg-danger-700 active:bg-danger-800 disabled:bg-danger-600",
   subtle:
-    "bg-neutral-100 text-neutral-800 hover:bg-neutral-200 active:bg-neutral-300",
+    "bg-primary-50 text-primary-800 hover:bg-primary-100 active:bg-primary-200",
 };
 
 const SIZES: Record<ButtonSize, string> = {

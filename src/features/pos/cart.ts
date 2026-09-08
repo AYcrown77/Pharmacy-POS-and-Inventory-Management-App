@@ -1,6 +1,6 @@
 import { lineTotal, sumMoney } from "@/lib/money";
 import type { DateOnly, Money } from "@/types/common";
-import type { PriceTier } from "@/types/domain";
+import { TIER_SELLS_PACKS, type PriceTier } from "@/types/domain";
 import type { SaleLookup } from "@/services/products.service";
 
 /**
@@ -25,6 +25,12 @@ export interface CartLine {
   unitPrice: Money;
   /** All three tier prices, so switching tier reprices without a refetch. */
   prices: Record<PriceTier, Money>;
+  /** Base units in one pack, so a tier switch can re-derive availability. */
+  unitsPerPack: number;
+  /** Base units this line's unit consumes: the pack size, or 1. */
+  unitsPerSaleUnit: number;
+  /** What the shelf holds, in base units. */
+  availableBase: number;
   quantity: number;
   /** Snapshot at the time of adding; the server re-checks at payment. */
   availableStock: number;
@@ -79,6 +85,9 @@ function lineFromLookup(
     CONSUMER: lookup.product.priceConsumer,
   };
 
+  const unitsPerPack = Math.max(lookup.product.unitsPerPack, 1);
+  const unitsPerSaleUnit = TIER_SELLS_PACKS[priceTier] ? unitsPerPack : 1;
+
   return {
     productId: lookup.product.id,
     productName: lookup.product.name,
@@ -88,8 +97,13 @@ function lineFromLookup(
         .join(" · ") || null,
     unitPrice: prices[priceTier],
     prices,
+    unitsPerPack,
+    unitsPerSaleUnit,
+    availableBase: lookup.availableStock,
     quantity,
-    availableStock: lookup.availableStock,
+    // Whole selling units only: two and a half packs is not something
+    // the shelf can hand over.
+    availableStock: Math.floor(lookup.availableStock / unitsPerSaleUnit),
     expectedBatchNumber: nextBatch?.batchNumber ?? null,
     expectedExpiry: nextBatch?.expiryDate ?? null,
   };
@@ -112,10 +126,24 @@ export function cartReducer(state: CartState, action: CartAction): CartState {
       return {
         ...state,
         priceTier: action.priceTier,
-        lines: state.lines.map((line) => ({
-          ...line,
-          unitPrice: line.prices[action.priceTier],
-        })),
+        lines: state.lines.map((line) => {
+          // Switching tier can change the unit as well as the price, so the
+          // quantity ceiling has to move with it: 48 singles is 2 packs.
+          const unitsPerSaleUnit = TIER_SELLS_PACKS[action.priceTier]
+            ? line.unitsPerPack
+            : 1;
+          const availableStock = Math.floor(line.availableBase / unitsPerSaleUnit);
+
+          return {
+            ...line,
+            unitPrice: line.prices[action.priceTier],
+            unitsPerSaleUnit,
+            availableStock,
+            // A cart of 3 singles becomes 3 packs only if the shelf can cover
+            // it; otherwise it drops to what is actually there.
+            quantity: Math.max(1, Math.min(line.quantity, availableStock)),
+          };
+        }),
       };
     }
 
