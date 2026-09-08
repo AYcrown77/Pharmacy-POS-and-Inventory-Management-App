@@ -113,7 +113,7 @@ export function ProductsPage() {
         sortable: true,
         width: "116px",
         cell: (product) => (
-          <NumericCell>{formatMoney(product.sellingPrice)}</NumericCell>
+          <NumericCell>{formatMoney(product.priceConsumer)}</NumericCell>
         ),
       },
       {

@@ -17,9 +17,10 @@ import { STOCK_AFFECTING_KEYS, salesKeys } from "@/lib/query/keys";
 import { productsService, type SaleLookup } from "@/services/products.service";
 import { salesService } from "@/services/sales.service";
 import type { Money } from "@/types/common";
-import type { PaymentMethod, Sale } from "@/types/domain";
+import type { PaymentMethod, Sale, Customer } from "@/types/domain";
 import { CartTable } from "./components/CartTable";
 import { CompleteSaleDialog } from "./components/CompleteSaleDialog";
+import { CustomerPicker } from "./components/CustomerPicker";
 import { OrderPanel } from "./components/OrderPanel";
 import { SaleSuccessDialog } from "./components/SaleSuccessDialog";
 import { ScanBar } from "./components/ScanBar";
@@ -45,6 +46,8 @@ export function PosTerminal() {
   const [payingOpen, setPayingOpen] = useState(false);
   const [saleError, setSaleError] = useState<string | null>(null);
   const [completedSale, setCompletedSale] = useState<Sale | null>(null);
+  const [customer, setCustomer] = useState<Customer | null>(null);
+  const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
 
   const scanRef = useRef<HTMLInputElement>(null);
 
@@ -137,6 +140,8 @@ export function PosTerminal() {
         })),
         discount: cart.state.discount,
         paymentMethod,
+        priceTier: cart.state.priceTier,
+        customerId: customer?.id ?? null,
         amountReceived,
         cashierId: user?.id ?? "",
         terminalId: terminal.id,
@@ -293,6 +298,12 @@ export function PosTerminal() {
         discount={cart.state.discount}
         total={cart.total}
         paymentMethod={paymentMethod}
+        customer={customer}
+        onChooseCustomer={() => setCustomerPickerOpen(true)}
+        priceTier={cart.state.priceTier}
+        onPriceTierChange={(priceTier) =>
+          cart.dispatch({ type: "SET_PRICE_TIER", priceTier })
+        }
         onPaymentMethodChange={setPaymentMethod}
         onClear={() => {
           cart.dispatch({ type: "CLEAR" });
@@ -301,6 +312,12 @@ export function PosTerminal() {
         onComplete={() => setPayingOpen(true)}
         canComplete={!cart.isEmpty && !busy}
         processing={busy}
+      />
+
+      <CustomerPicker
+        open={customerPickerOpen}
+        onOpenChange={setCustomerPickerOpen}
+        onSelect={setCustomer}
       />
 
       <CompleteSaleDialog
@@ -317,6 +334,7 @@ export function PosTerminal() {
         total={cart.total}
         itemCount={cart.itemCount}
         paymentMethod={paymentMethod}
+        customer={customer}
         processing={busy}
         error={saleError}
         onConfirm={(amountReceived) => complete.mutate(amountReceived)}

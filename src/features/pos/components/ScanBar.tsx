@@ -7,6 +7,7 @@ import { forwardRef, useState, type KeyboardEvent } from "react";
 import { cn } from "@/lib/cn";
 import { useDebounce } from "@/hooks/useDebounce";
 import { productKeys } from "@/lib/query/keys";
+import { unitLabel } from "@/lib/status";
 import { formatMoney, formatQuantity } from "@/lib/money";
 import { productsService } from "@/services/products.service";
 import { KeyHint } from "@/components/ui/Tooltip";
@@ -178,7 +179,7 @@ export const ScanBar = forwardRef<HTMLInputElement, ScanBarProps>(
 
                     <span className="num shrink-0 text-right">
                       <span className="block text-base font-semibold text-neutral-900">
-                        {formatMoney(product.sellingPrice)}
+                        {formatMoney(product.priceConsumer)}
                       </span>
                       <span
                         className={cn(
@@ -190,7 +191,10 @@ export const ScanBar = forwardRef<HTMLInputElement, ScanBarProps>(
                       >
                         {outOfStock
                           ? "Out of stock"
-                          : `${formatQuantity(product.availableStock)} available`}
+                          : `${formatQuantity(product.availableStock)} ${unitLabel(
+                              product.availableStock,
+                              product.unitType,
+                            )} available`}
                       </span>
                     </span>
                   </button>

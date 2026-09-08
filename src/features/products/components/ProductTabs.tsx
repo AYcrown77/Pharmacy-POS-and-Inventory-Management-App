@@ -77,7 +77,7 @@ export function ProductOverviewTab({
         <StatCard
           size="sm"
           label="Selling price"
-          value={formatMoney(product.sellingPrice)}
+          value={formatMoney(product.priceConsumer)}
           context={`Per ${UNIT_TYPE_LABELS[product.unitType].toLowerCase()}`}
         />
         <StatCard

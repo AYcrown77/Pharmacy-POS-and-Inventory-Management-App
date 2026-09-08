@@ -177,7 +177,7 @@ export function ProductPicker({
                     {formatQuantity(product.availableStock)} in stock
                   </span>
                   <span className="block text-neutral-500">
-                    {formatMoney(product.sellingPrice)}
+                    {formatMoney(product.priceConsumer)}
                   </span>
                 </span>
               </button>

@@ -39,7 +39,12 @@ export interface UsersService {
   update(id: string, input: UpdateUserInput, actorId: string): Promise<User>;
   /** Disable or re-enable an account. */
   setActive(id: string, isActive: boolean, actorId: string): Promise<User>;
-  resetPassword(id: string, password: string, actorId: string): Promise<void>;
+  resetPassword(
+    id: string,
+    password: string,
+    currentPassword: string,
+    actorId: string,
+  ): Promise<void>;
 }
 
 const mockUsersService: UsersService = {
@@ -165,7 +170,7 @@ const mockUsersService: UsersService = {
       return user;
     }),
 
-  resetPassword: (id, _password, actorId) =>
+  resetPassword: (id, _password, _currentPassword, actorId) =>
     mockRequest(() => {
       const actor = requireActor(actorId);
       const user = requireUser(id);
@@ -219,8 +224,8 @@ const httpUsersService: UsersService = {
   update: (id, input) => http.patch<User>(`/users/${id}`, input),
   setActive: (id, isActive) =>
     http.patch<User>(`/users/${id}/status`, { isActive }),
-  resetPassword: (id, password) =>
-    http.post<void>(`/users/${id}/password`, { password }),
+  resetPassword: (id, password, currentPassword) =>
+    http.post<void>(`/users/${id}/password`, { password, currentPassword }),
 };
 
 export const usersService: UsersService = USE_MOCKS

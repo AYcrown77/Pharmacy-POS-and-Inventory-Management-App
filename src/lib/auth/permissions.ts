@@ -29,6 +29,7 @@ export type Permission =
   | "stock:adjust"
   // Back office
   | "reports:read"
+  | "customers:manage"
   | "users:manage"
   | "audit:read"
   | "settings:manage";
@@ -57,11 +58,19 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "stock:receive",
     "stock:adjust",
     "reports:read",
+    "customers:manage",
     "users:manage",
     "audit:read",
     "settings:manage",
   ],
-  CASHIER: ["pos:use", "sales:read:own", "sales:refund", "products:read"],
+  CASHIER: [
+    "pos:use",
+    "sales:read:own",
+    "sales:refund",
+    "products:read",
+    // A cashier attaches accounts and takes repayments at the counter.
+    "customers:manage",
+  ],
 };
 
 export function hasPermission(
@@ -122,6 +131,7 @@ const ROUTE_PERMISSIONS: ReadonlyArray<readonly [string, Permission]> = [
   ["/sales", "sales:read:own"],
   ["/returns", "sales:refund"],
   ["/reports", "reports:read"],
+  ["/customers", "customers:manage"],
   ["/users", "users:manage"],
   ["/audit", "audit:read"],
   ["/settings", "settings:manage"],

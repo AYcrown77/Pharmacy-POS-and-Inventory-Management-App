@@ -1,6 +1,7 @@
 "use client";
 
 import { formatDate, formatTime, timestampToDateOnly } from "@/lib/date";
+import { cn } from "@/lib/cn";
 import { formatMoney, formatQuantity } from "@/lib/money";
 import { PAYMENT_METHOD_LABELS } from "@/lib/status";
 import type { PharmacySettings, Sale } from "@/types/domain";
@@ -116,6 +117,45 @@ export function ReceiptDocument({
         )}
       </div>
 
+      {/*
+        The account statement.
+
+        A customer who has just taken goods on credit needs the new balance in
+        their hand — that piece of paper is the only record they leave with,
+        and a debt nobody was told about is a debt that gets disputed. The
+        figures are the ones stored on the sale, not read live, so reprinting
+        an old receipt shows what the customer was actually told at the time.
+      */}
+      {sale.customerId && (
+        <>
+          <Divider />
+          <div className="flex flex-col gap-0.5 tabular-nums">
+            <Line label="Account" value={sale.customerName ?? ""} />
+            {sale.debtCharged > 0 && (
+              <Line
+                label="Added to account"
+                value={formatMoney(sale.debtCharged)}
+              />
+            )}
+            {sale.debtRepaid > 0 && (
+              <Line
+                label="Paid off account"
+                value={formatMoney(sale.debtRepaid)}
+              />
+            )}
+            {sale.customerBalanceAfter !== null && (
+              <Line
+                label={
+                  sale.customerBalanceAfter < 0 ? "Balance in credit" : "Balance owing"
+                }
+                value={formatMoney(Math.abs(sale.customerBalanceAfter))}
+                strong
+              />
+            )}
+          </div>
+        </>
+      )}
+
       {sale.status !== "COMPLETED" && (
         <>
           <Divider />
@@ -150,9 +190,18 @@ function Divider() {
   return <hr className="my-1.5 border-t border-dashed border-black" />;
 }
 
-function Line({ label, value }: { label: string; value: string }) {
+function Line({
+  label,
+  value,
+  strong = false,
+}: {
+  label: string;
+  value: string;
+  /** For the figure the customer is meant to leave remembering. */
+  strong?: boolean;
+}) {
   return (
-    <div className="flex justify-between gap-1.5">
+    <div className={cn("flex justify-between gap-1.5", strong && "font-bold")}>
       <span className="shrink-0">{label}</span>
       <span className="break-words text-right">{value}</span>
     </div>

@@ -146,7 +146,9 @@ export function InventoryReportPage() {
           { header: "Stock status", value: (i) => i.stockStatus },
           { header: "Nearest expiry", value: (i) => csvDate(i.nearestExpiry) },
           { header: "Expiry status", value: (i) => i.expiryStatus },
-          { header: "Unit price", value: (i) => csvMoney(i.product.sellingPrice) },
+          { header: "Wholesale", value: (i) => csvMoney(i.product.priceWholesale) },
+          { header: "Retail", value: (i) => csvMoney(i.product.priceRetail) },
+          { header: "Consumer", value: (i) => csvMoney(i.product.priceConsumer) },
           { header: "Stock value", value: (i) => csvMoney(i.stockValue) },
         ], list.data?.data ?? [])
       }

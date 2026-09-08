@@ -15,6 +15,7 @@ import { PAYMENT_METHODS } from "@/lib/status";
 import type { DateOnly, DateRange, Money } from "@/types/common";
 import type {
   CashierReportRow,
+  DebtorRow,
   MovementReportSummary,
   PaymentMixEntry,
   SalesReportSummary,
@@ -40,6 +41,8 @@ export interface ReportsService {
   movementSummary(
     filters: MovementReportFilters,
   ): Promise<MovementReportSummary>;
+  /** Accounts currently owing, largest balance first. */
+  debtors(): Promise<DebtorRow[]>;
 }
 
 /* -------------------------------------------------------------------------
@@ -192,6 +195,21 @@ const mockReportsService: ReportsService = {
         netUnits: unitsIn - unitsOut,
       } satisfies MovementReportSummary;
     }),
+
+  debtors: () =>
+    mockRequest(() =>
+      db.customers
+        .filter((customer) => customer.balance > 0)
+        .sort((a, b) => b.balance - a.balance)
+        .map((customer) => ({
+          customerId: customer.id,
+          customerName: customer.name,
+          phone: customer.phone,
+          balance: customer.balance,
+          daysSinceLastPayment: null,
+          lastActivityAt: null,
+        })),
+    ),
 };
 
 /* -------------------------------------------------------------------------
@@ -209,6 +227,7 @@ const httpReportsService: ReportsService = {
     http.get<MovementReportSummary>("/reports/stock-movements/summary", {
       params: filters,
     }),
+  debtors: () => http.get<DebtorRow[]>("/reports/debtors"),
 };
 
 export const reportsService: ReportsService = USE_MOCKS

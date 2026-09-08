@@ -25,6 +25,22 @@ export interface InventorySummary {
   expiredCount: number;
 }
 
+/** Money handed over as goods and not yet paid for. */
+export interface DebtSummary {
+  totalOwed: Money;
+  accountsOwing: number;
+}
+
+export interface DebtorRow {
+  customerId: string;
+  customerName: string;
+  phone: string | null;
+  balance: Money;
+  /** Days since money last came in against this account. */
+  daysSinceLastPayment: number | null;
+  lastActivityAt: Timestamp | null;
+}
+
 export interface DashboardSummary {
   todaySales: Money;
   todayTransactions: number;
@@ -32,6 +48,7 @@ export interface DashboardSummary {
   /** Change against yesterday's takings; null when yesterday had none. */
   salesChangePercent: number | null;
   inventory: InventorySummary;
+  debt: DebtSummary;
 }
 
 export interface SalesTrendPoint {

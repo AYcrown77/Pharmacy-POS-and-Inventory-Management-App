@@ -36,7 +36,9 @@ export interface ProductInput {
   categoryId: string;
   strength: string | null;
   dosageForm: DosageForm | null;
-  sellingPrice: Money;
+  priceWholesale: Money;
+  priceRetail: Money;
+  priceConsumer: Money;
   minimumStockLevel: number;
   unitType: UnitType;
   isActive: boolean;
@@ -83,6 +85,8 @@ export interface ProductsService {
   create(input: ProductInput, userId: string): Promise<Product>;
   update(id: string, input: ProductInput, userId: string): Promise<Product>;
   listCategories(): Promise<Category[]>;
+  /** Creates a category typed on the fly while adding a product. */
+  createCategory(name: string): Promise<Category>;
 }
 
 /* -------------------------------------------------------------------------
@@ -105,7 +109,8 @@ function applyProductSort(
   const direction = filters.sortDir ?? "asc";
   switch (filters.sortBy) {
     case "sellingPrice":
-      return sortBy(items, (item) => item.sellingPrice, direction);
+      // "Price" in the list means the walk-in price, which is what it shows.
+      return sortBy(items, (item) => item.priceConsumer, direction);
     case "availableStock":
       return sortBy(items, (item) => item.availableStock, direction);
     case "category":
@@ -251,7 +256,12 @@ const mockProductsService: ProductsService = {
         action: "PRODUCT_CREATED",
         entityType: "PRODUCT",
         entityId: product.id,
-        newValue: { name: product.name, sellingPrice: product.sellingPrice },
+        newValue: {
+          name: product.name,
+          priceWholesale: product.priceWholesale,
+          priceRetail: product.priceRetail,
+          priceConsumer: product.priceConsumer,
+        },
       });
 
       return product;
@@ -278,7 +288,11 @@ const mockProductsService: ProductsService = {
         }
       }
 
-      const previousPrice = product.sellingPrice;
+      const previousPrices = {
+        priceWholesale: product.priceWholesale,
+        priceRetail: product.priceRetail,
+        priceConsumer: product.priceConsumer,
+      };
 
       Object.assign(product, input, {
         category:
@@ -296,15 +310,24 @@ const mockProductsService: ProductsService = {
       });
 
       // A price change is separately tracked — §24 lists it as its own action.
-      if (previousPrice !== input.sellingPrice) {
+      const pricesChanged =
+        previousPrices.priceWholesale !== input.priceWholesale ||
+        previousPrices.priceRetail !== input.priceRetail ||
+        previousPrices.priceConsumer !== input.priceConsumer;
+
+      if (pricesChanged) {
         recordAudit({
           userId: user.id,
           userName: user.name,
           action: "PRICE_CHANGED",
           entityType: "PRODUCT",
           entityId: product.id,
-          oldValue: { sellingPrice: previousPrice },
-          newValue: { sellingPrice: input.sellingPrice },
+          oldValue: previousPrices,
+          newValue: {
+            priceWholesale: input.priceWholesale,
+            priceRetail: input.priceRetail,
+            priceConsumer: input.priceConsumer,
+          },
         });
       }
 
@@ -312,6 +335,23 @@ const mockProductsService: ProductsService = {
     }),
 
   listCategories: () => mockRequest(() => [...db.categories]),
+
+  createCategory: (name) =>
+    mockRequest(() => {
+      const trimmed = name.trim();
+      const existing = db.categories.find(
+        (item) => item.name.toLowerCase() === trimmed.toLowerCase(),
+      );
+      if (existing) return existing;
+
+      const category: Category = {
+        id: `cat-${Date.now().toString(36)}`,
+        name: trimmed,
+        description: null,
+      };
+      db.categories.push(category);
+      return category;
+    }),
 };
 
 /* -------------------------------------------------------------------------
@@ -335,6 +375,8 @@ const httpProductsService: ProductsService = {
   create: (input) => http.post<Product>("/products", input),
   update: (id, input) => http.patch<Product>(`/products/${id}`, input),
   listCategories: () => http.get<Category[]>("/categories"),
+  createCategory: (name) =>
+    http.post<Category>("/categories", { name, description: null }),
 };
 
 export const productsService: ProductsService = USE_MOCKS

@@ -64,6 +64,12 @@ export interface UserFormValues {
 
 export const resetPasswordSchema = z.object({
   password: passwordField,
+  /**
+   * The signed-in administrator's own password, not the staff member's.
+   * Re-authenticating here is what stops an unattended admin session from
+   * being enough to take over an account.
+   */
+  currentPassword: z.string().min(1, "Enter your password to confirm"),
 });
 
 export type ResetPasswordValues = z.input<typeof resetPasswordSchema>;

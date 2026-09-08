@@ -215,7 +215,7 @@ export function ResetPasswordModal({
   onOpenChange: (open: boolean) => void;
   user: User | null;
   isSubmitting: boolean;
-  onSubmit: (password: string) => Promise<unknown>;
+  onSubmit: (password: string, currentPassword: string) => Promise<unknown>;
 }) {
   const [showPassword, setShowPassword] = useState(false);
 
@@ -226,7 +226,7 @@ export function ResetPasswordModal({
     formState: { errors },
   } = useForm<ResetPasswordValues>({
     resolver: zodResolver(resetPasswordSchema),
-    defaultValues: { password: "" },
+    defaultValues: { password: "", currentPassword: "" },
   });
 
   return (
@@ -234,7 +234,7 @@ export function ResetPasswordModal({
       open={open}
       onOpenChange={onOpenChange}
       title={`Reset password for ${user?.name ?? ""}`}
-      description="The staff member is not notified — hand them the new password yourself."
+      description="Confirm with your own password. The staff member is not notified — hand them the new one yourself."
       size="sm"
       dismissible={!isSubmitting}
       footer={
@@ -251,7 +251,7 @@ export function ResetPasswordModal({
             loading={isSubmitting}
             onClick={() =>
               void handleSubmit(async (values) => {
-                await onSubmit(values.password);
+                await onSubmit(values.password, values.currentPassword);
                 reset();
                 onOpenChange(false);
               })()
@@ -290,6 +290,22 @@ export function ResetPasswordModal({
                 )}
               </button>
             }
+          />
+        )}
+      </FormField>
+
+      <FormField
+        label="Your password"
+        error={errors.currentPassword?.message}
+        required
+        hint="Confirms it is you making this change, not someone at your unattended terminal."
+      >
+        {(ids) => (
+          <Input
+            {...ids}
+            {...register("currentPassword")}
+            type="password"
+            autoComplete="current-password"
           />
         )}
       </FormField>

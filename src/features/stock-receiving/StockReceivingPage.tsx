@@ -116,7 +116,7 @@ export function StockReceivingPage() {
   useEffect(() => {
     setValue("productId", product?.id ?? "", { shouldValidate: false });
     if (product) {
-      setValue("sellingPrice", koboToNaira(product.sellingPrice));
+      setValue("sellingPrice", koboToNaira(product.priceConsumer));
     }
   }, [product, setValue]);
 
@@ -158,11 +158,11 @@ export function StockReceivingPage() {
   if (
     product &&
     sellingPrice > 0 &&
-    nairaToKobo(sellingPrice) !== product.sellingPrice
+    nairaToKobo(sellingPrice) !== product.priceConsumer
   ) {
     warnings.push(
       `This changes the catalogue selling price from ${formatMoney(
-        product.sellingPrice,
+        product.priceConsumer,
       )} to ${formatMoney(nairaToKobo(sellingPrice))}.`,
     );
   }

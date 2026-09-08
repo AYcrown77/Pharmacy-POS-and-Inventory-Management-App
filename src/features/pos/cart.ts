@@ -1,5 +1,6 @@
 import { lineTotal, sumMoney } from "@/lib/money";
 import type { DateOnly, Money } from "@/types/common";
+import type { PriceTier } from "@/types/domain";
 import type { SaleLookup } from "@/services/products.service";
 
 /**
@@ -16,7 +17,14 @@ export interface CartLine {
   productName: string;
   /** Shown under the name so the cashier can confirm the right pack. */
   description: string | null;
+  /**
+   * What this line is charged at, for the tier the cart is currently on.
+   * Derived from `prices` — never set independently, or the total on screen
+   * could disagree with what the server charges.
+   */
   unitPrice: Money;
+  /** All three tier prices, so switching tier reprices without a refetch. */
+  prices: Record<PriceTier, Money>;
   quantity: number;
   /** Snapshot at the time of adding; the server re-checks at payment. */
   availableStock: number;
@@ -31,6 +39,12 @@ export interface CartLine {
 export interface CartState {
   lines: CartLine[];
   discount: Money;
+  /**
+   * One tier for the whole basket. A customer is a wholesaler or a walk-in,
+   * not both mid-sale, and the server prices the entire sale at one tier — so
+   * holding it per line would let the displayed total drift from the charge.
+   */
+  priceTier: PriceTier;
   /** Set briefly after a line changes, so the UI can flash that row. */
   lastTouchedProductId: string | null;
 }
@@ -38,6 +52,7 @@ export interface CartState {
 export const emptyCart: CartState = {
   lines: [],
   discount: 0,
+  priceTier: "CONSUMER",
   lastTouchedProductId: null,
 };
 
@@ -47,11 +62,22 @@ export type CartAction =
   | { type: "ADJUST_QUANTITY"; productId: string; delta: number }
   | { type: "REMOVE"; productId: string }
   | { type: "SET_DISCOUNT"; discount: Money }
+  | { type: "SET_PRICE_TIER"; priceTier: PriceTier }
   | { type: "CLEAR" }
   | { type: "RESTORE"; state: CartState };
 
-function lineFromLookup(lookup: SaleLookup, quantity: number): CartLine {
+function lineFromLookup(
+  lookup: SaleLookup,
+  quantity: number,
+  priceTier: PriceTier,
+): CartLine {
   const nextBatch = lookup.sellableBatches[0] ?? null;
+
+  const prices: Record<PriceTier, Money> = {
+    WHOLESALE: lookup.product.priceWholesale,
+    RETAIL: lookup.product.priceRetail,
+    CONSUMER: lookup.product.priceConsumer,
+  };
 
   return {
     productId: lookup.product.id,
@@ -60,7 +86,8 @@ function lineFromLookup(lookup: SaleLookup, quantity: number): CartLine {
       [lookup.product.strength, lookup.product.brandName]
         .filter(Boolean)
         .join(" · ") || null,
-    unitPrice: lookup.product.sellingPrice,
+    unitPrice: prices[priceTier],
+    prices,
     quantity,
     availableStock: lookup.availableStock,
     expectedBatchNumber: nextBatch?.batchNumber ?? null,
@@ -78,6 +105,20 @@ function clampToStock(line: CartLine, quantity: number): CartLine {
 
 export function cartReducer(state: CartState, action: CartAction): CartState {
   switch (action.type) {
+    case "SET_PRICE_TIER": {
+      // Repricing every line, not just the ones added afterwards: the server
+      // charges the whole basket at one tier, so anything else would show the
+      // cashier a total the customer is not asked to pay.
+      return {
+        ...state,
+        priceTier: action.priceTier,
+        lines: state.lines.map((line) => ({
+          ...line,
+          unitPrice: line.prices[action.priceTier],
+        })),
+      };
+    }
+
     case "ADD": {
       const { lookup } = action;
       const quantity = action.quantity ?? 1;
@@ -107,7 +148,10 @@ export function cartReducer(state: CartState, action: CartAction): CartState {
       return {
         ...state,
         // Newest at the top: the cashier watches what they just scanned.
-        lines: [lineFromLookup(lookup, quantity), ...state.lines],
+        lines: [
+          lineFromLookup(lookup, quantity, state.priceTier),
+          ...state.lines,
+        ],
         lastTouchedProductId: lookup.product.id,
       };
     }

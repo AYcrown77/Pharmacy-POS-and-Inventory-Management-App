@@ -73,6 +73,14 @@ const mockDashboardService: DashboardService = {
               100
             : null,
         inventory,
+        // The mock store keeps its own accounts, so this stays truthful there too.
+        debt: {
+          totalOwed: db.customers.reduce(
+            (total, customer) => total + Math.max(customer.balance, 0),
+            0,
+          ),
+          accountsOwing: db.customers.filter((c) => c.balance > 0).length,
+        },
       } satisfies DashboardSummary;
     });
   },

@@ -9,7 +9,13 @@ import { KeyHint } from "@/components/ui/Tooltip";
 import { formatMoney, formatQuantity } from "@/lib/money";
 import { PAYMENT_METHOD_LABELS } from "@/lib/status";
 import type { Money } from "@/types/common";
-import type { PaymentMethod } from "@/types/domain";
+import type { PaymentMethod, PriceTier, Customer } from "@/types/domain";
+
+const PRICE_TIER_OPTIONS: { tier: PriceTier; label: string }[] = [
+  { tier: "WHOLESALE", label: "Wholesale" },
+  { tier: "RETAIL", label: "Retail" },
+  { tier: "CONSUMER", label: "Consumer" },
+];
 
 const PAYMENT_OPTIONS: Array<{
   method: PaymentMethod;
@@ -32,6 +38,10 @@ export function OrderPanel({
   total,
   paymentMethod,
   onPaymentMethodChange,
+  priceTier,
+  onPriceTierChange,
+  customer,
+  onChooseCustomer,
   onClear,
   onComplete,
   canComplete,
@@ -43,6 +53,10 @@ export function OrderPanel({
   total: Money;
   paymentMethod: PaymentMethod;
   onPaymentMethodChange: (method: PaymentMethod) => void;
+  priceTier: PriceTier;
+  onPriceTierChange: (tier: PriceTier) => void;
+  customer: Customer | null;
+  onChooseCustomer: () => void;
   onClear: () => void;
   onComplete: () => void;
   canComplete: boolean;
@@ -92,6 +106,65 @@ export function OrderPanel({
           <span className="num text-total font-bold tabular-nums text-neutral-900">
             {formatMoney(total)}
           </span>
+        </div>
+      </div>
+
+      {/* Who the sale is for. Shown before payment, because whether someone
+          may take goods without paying depends on what they already owe. */}
+      <button
+        type="button"
+        onClick={onChooseCustomer}
+        disabled={processing}
+        className="flex items-center justify-between gap-2 border-t border-neutral-200 px-4 py-2.5 text-left hover:bg-neutral-50 disabled:opacity-60"
+      >
+        <span className="min-w-0">
+          <span className="block text-micro font-semibold uppercase tracking-wide text-neutral-400">
+            Customer
+          </span>
+          <span className="block truncate text-base font-medium text-neutral-900">
+            {customer?.name ?? "Walk-in"}
+          </span>
+        </span>
+        {customer && customer.balance > 0 && (
+          <span className="num shrink-0 text-meta font-semibold text-danger-700">
+            Owes {formatMoney(customer.balance)}
+          </span>
+        )}
+      </button>
+
+      <div className="flex flex-col gap-2 border-t border-neutral-200 px-4 py-3">
+        <p className="text-micro font-semibold uppercase tracking-wide text-neutral-400">
+          Price list
+        </p>
+
+        {/* One tier for the whole basket — switching it reprices every line,
+            because the server charges the entire sale at one price list. */}
+        <div
+          role="radiogroup"
+          aria-label="Price list"
+          className="grid grid-cols-3 gap-1 rounded-md bg-neutral-100 p-1"
+        >
+          {PRICE_TIER_OPTIONS.map((option) => {
+            const selected = priceTier === option.tier;
+            return (
+              <button
+                key={option.tier}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                disabled={processing}
+                onClick={() => onPriceTierChange(option.tier)}
+                className={cn(
+                  "h-control rounded-sm px-2 text-meta font-medium transition-colors disabled:opacity-60",
+                  selected
+                    ? "bg-white text-primary-800 shadow-card"
+                    : "text-neutral-600 hover:text-neutral-900",
+                )}
+              >
+                {option.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 

@@ -9,7 +9,7 @@ import { Modal } from "@/components/ui/Modal";
 import { formatMoney, nairaToKobo, parseMoneyInput } from "@/lib/money";
 import { PAYMENT_METHOD_LABELS } from "@/lib/status";
 import type { Money } from "@/types/common";
-import type { PaymentMethod } from "@/types/domain";
+import type { PaymentMethod, Customer } from "@/types/domain";
 
 /** Notes a Nigerian pharmacy actually gets handed. */
 const QUICK_TENDER_NAIRA = [500, 1000, 2000, 5000, 10_000];
@@ -20,6 +20,7 @@ export function CompleteSaleDialog({
   total,
   itemCount,
   paymentMethod,
+  customer,
   processing,
   error,
   onConfirm,
@@ -29,6 +30,8 @@ export function CompleteSaleDialog({
   total: Money;
   itemCount: number;
   paymentMethod: PaymentMethod;
+  /** Attached account, if this sale is on credit rather than a walk-in. */
+  customer: Customer | null;
   processing: boolean;
   /** A server rejection, shown without closing so the cart survives. */
   error: string | null;
@@ -46,11 +49,37 @@ export function CompleteSaleDialog({
 
   // Cash needs an amount before the sale can be confirmed; the other methods
   // are settled on the bank's terminal before the cashier gets here.
+  // A shortfall is only payable if there is an account to bill it to. A
+  // walk-in who cannot pay in full has to put something back.
   const canConfirm = processing
     ? false
     : isCash
-      ? receivedKobo !== null && receivedKobo >= total
+      ? receivedKobo !== null && (receivedKobo >= total || customer !== null)
       : true;
+
+  /** What this payment will do to the customer's balance. */
+  const debtEffect = (() => {
+    if (!customer || receivedKobo === null) return null;
+
+    if (shortfall !== null) {
+      return {
+        tone: "charge" as const,
+        text: `${formatMoney(shortfall)} added to ${customer.name}'s account`,
+        balanceAfter: customer.balance + shortfall,
+      };
+    }
+
+    // A surplus clears what they owe before any change is handed back.
+    const surplus = receivedKobo - total;
+    const repaid = Math.min(surplus, Math.max(customer.balance, 0));
+    if (repaid <= 0) return null;
+
+    return {
+      tone: "repay" as const,
+      text: `${formatMoney(repaid)} taken off ${customer.name}'s account`,
+      balanceAfter: customer.balance - repaid,
+    };
+  })();
 
   // Note: the caller keys this component on `open`, so a fresh instance
   // mounts each time the dialog is raised and `received` starts empty. That
@@ -163,6 +192,46 @@ export function CompleteSaleDialog({
                 ))}
             </div>
 
+            {customer && (
+              <div className="flex flex-col gap-1 rounded-md bg-neutral-50 px-3 py-2 ring-1 ring-inset ring-neutral-200">
+                <div className="flex items-center justify-between">
+                  <span className="text-meta font-medium text-neutral-600">
+                    {customer.name}
+                  </span>
+                  <span
+                    className={cn(
+                      "num text-meta font-semibold",
+                      customer.balance > 0
+                        ? "text-danger-700"
+                        : "text-neutral-500",
+                    )}
+                  >
+                    {customer.balance > 0
+                      ? `Owes ${formatMoney(customer.balance)}`
+                      : "Settled"}
+                  </span>
+                </div>
+
+                {debtEffect && (
+                  <div className="flex items-center justify-between gap-2 border-t border-neutral-200 pt-1">
+                    <span
+                      className={cn(
+                        "text-meta",
+                        debtEffect.tone === "charge"
+                          ? "text-warning-800"
+                          : "text-success-700",
+                      )}
+                    >
+                      {debtEffect.text}
+                    </span>
+                    <span className="num shrink-0 text-meta font-semibold text-neutral-700">
+                      New balance {formatMoney(debtEffect.balanceAfter)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div
               id="change-due"
               aria-live="polite"
@@ -176,7 +245,11 @@ export function CompleteSaleDialog({
               )}
             >
               <span className="text-meta font-medium text-neutral-600">
-                {shortfall !== null ? "Still owing" : "Change"}
+                {shortfall !== null
+                  ? customer
+                    ? "To account"
+                    : "Still owing"
+                  : "Change"}
               </span>
               <span
                 className={cn(

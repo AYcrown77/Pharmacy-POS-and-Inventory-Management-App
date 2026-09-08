@@ -17,6 +17,15 @@ export type Role = "ADMINISTRATOR" | "CASHIER";
 
 export type PaymentMethod = "CASH" | "CARD" | "TRANSFER";
 
+/**
+ * The three prices a product carries.
+ *
+ * A pharmacy sells the same pack to a walk-in customer, a corner shop and a
+ * distributor at different prices. The sale records which list it charged, so
+ * a later price edit cannot change what an old receipt appears to have said.
+ */
+export type PriceTier = "WHOLESALE" | "RETAIL" | "CONSUMER";
+
 export type SaleStatus = "COMPLETED" | "PARTIALLY_RETURNED" | "REVERSED";
 
 export type StockStatus = "IN_STOCK" | "LOW_STOCK" | "OUT_OF_STOCK";
@@ -117,7 +126,9 @@ export interface Product {
   category: Category | null;
   strength: string | null;
   dosageForm: DosageForm | null;
-  sellingPrice: Money;
+  priceWholesale: Money;
+  priceRetail: Money;
+  priceConsumer: Money;
   minimumStockLevel: number;
   unitType: UnitType;
   isActive: boolean;
@@ -177,14 +188,28 @@ export interface Sale {
   terminalName: string;
   cashierId: string;
   cashierName: string;
+  /** Null for a walk-in, which is most sales. */
+  customerId: string | null;
+  customerName: string | null;
   subtotal: Money;
   discount: Money;
   total: Money;
   paymentMethod: PaymentMethod;
+  /** Which price list this sale was rung up at. */
+  priceTier: PriceTier;
   /** Cash sales only. */
   amountReceived: Money | null;
   changeGiven: Money | null;
   status: SaleStatus;
+  /** What this sale added to the customer's debt. */
+  debtCharged: Money;
+  /** What an overpayment took off an existing balance. */
+  debtRepaid: Money;
+  /**
+   * The balance as it stood when the receipt printed. Stored rather than read
+   * live, so a reprint shows what the customer was told at the time.
+   */
+  customerBalanceAfter: Money | null;
   items: SaleItem[];
   createdAt: Timestamp;
 }
@@ -266,6 +291,43 @@ export interface SaleReturn {
   reason: string;
   processedBy: string;
   processedByName: string;
+  createdAt: Timestamp;
+}
+
+/** Someone who buys on account and can carry a balance. */
+export interface Customer {
+  id: string;
+  name: string;
+  phone: string | null;
+  note: string | null;
+  /** Kobo owed to the pharmacy. Negative means they are in credit. */
+  balance: Money;
+  isActive: boolean;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+export type LedgerEntryType = "CHARGE" | "REPAYMENT" | "REVERSAL" | "ADJUSTMENT";
+
+/**
+ * One movement of a customer's balance.
+ *
+ * Append-only: a balance that was wrong is corrected with a further entry, so
+ * both the error and the correction stay on the record.
+ */
+export interface CustomerLedgerEntry {
+  id: string;
+  customerId: string;
+  entryType: LedgerEntryType;
+  /** Signed kobo: positive increases the debt, negative reduces it. */
+  amount: Money;
+  balanceBefore: Money;
+  balanceAfter: Money;
+  saleId: string | null;
+  receiptNumber: string | null;
+  reason: string | null;
+  userId: string;
+  userName: string;
   createdAt: Timestamp;
 }
 

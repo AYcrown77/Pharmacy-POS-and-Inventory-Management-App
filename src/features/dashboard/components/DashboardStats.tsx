@@ -5,6 +5,7 @@ import {
   Ban,
   Boxes,
   CalendarClock,
+  HandCoins,
   Pill,
   Receipt,
   TrendingDown,
@@ -122,6 +123,21 @@ export function DashboardStats({
       </div>
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        {/* The other half of the day's money: what came in, and what is still
+            out there. Only coloured when someone actually owes something. */}
+        <StatCard
+          size="sm"
+          label="Owed to us"
+          value={formatMoneyCompact(data.debt.totalOwed)}
+          icon={<HandCoins className="size-4" />}
+          tone="warning"
+          accent={data.debt.totalOwed > 0}
+          context={
+            data.debt.accountsOwing > 0
+              ? `${data.debt.accountsOwing} account${data.debt.accountsOwing === 1 ? "" : "s"} owing`
+              : "All accounts settled"
+          }
+        />
         <StatCard
           size="sm"
           label="Total Products"

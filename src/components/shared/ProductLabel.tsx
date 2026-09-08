@@ -32,7 +32,7 @@ export function ProductLabel({
       {strength && <p className="text-[9px] leading-tight">{strength}</p>}
 
       <p className="text-[15px] font-bold leading-none tabular-nums">
-        {formatMoney(product.sellingPrice)}
+        {formatMoney(product.priceConsumer)}
       </p>
 
       {product.barcode ? (

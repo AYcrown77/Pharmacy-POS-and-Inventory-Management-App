@@ -4,12 +4,13 @@ import Link from "next/link";
 import {
   ArrowRight,
   CalendarClock,
+  ClipboardList,
   FileBarChart,
+  HandCoins,
   Users,
   Warehouse,
   type LucideIcon,
 } from "lucide-react";
-import { ClipboardList } from "lucide-react";
 
 import { Card } from "@/components/ui/Card";
 import { PageContainer, PageHeader } from "@/components/ui/PageHeader";
@@ -56,6 +57,13 @@ const REPORTS: ReportLink[] = [
     description:
       "Takings per cashier, broken down by payment method for reconciliation.",
     icon: Users,
+  },
+  {
+    href: "/reports/debtors",
+    title: "Debtors",
+    description:
+      "Customer accounts carrying a balance, and how long each has been quiet.",
+    icon: HandCoins,
   },
 ];
 

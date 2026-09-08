@@ -48,7 +48,9 @@ export interface SeedProduct {
   categoryId: string;
   strength: string | null;
   dosageForm: DosageForm | null;
-  sellingPrice: number;
+  priceWholesale: number;
+  priceRetail: number;
+  priceConsumer: number;
   minimumStockLevel: number;
   unitType: UnitType;
   isActive: boolean;
@@ -76,7 +78,10 @@ function product(
     categoryId,
     strength,
     dosageForm,
-    sellingPrice: nairaToKobo(priceNaira),
+    // Trade buyers pay less than the walk-in price.
+    priceConsumer: nairaToKobo(priceNaira),
+    priceRetail: Math.round(nairaToKobo(priceNaira) * 0.88 / 100) * 100,
+    priceWholesale: Math.round(nairaToKobo(priceNaira) * 0.8 / 100) * 100,
     minimumStockLevel,
     unitType,
     isActive: true,

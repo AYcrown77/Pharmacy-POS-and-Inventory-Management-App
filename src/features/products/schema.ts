@@ -37,7 +37,17 @@ export const productSchema = z.object({
       "A barcode is 8 to 14 digits",
     ),
 
-  categoryId: z.string().min(1, "Choose a category"),
+  /**
+   * The category as typed, not its id. An admin adding a product should not
+   * have to leave the form to create a category that does not exist yet, so
+   * the field accepts anything and the name is resolved to an id — creating
+   * it if needed — when the form is submitted.
+   */
+  categoryName: z
+    .string()
+    .trim()
+    .min(1, "Choose or type a category")
+    .max(80, "Category name is too long"),
 
   strength: optionalText,
 
@@ -47,9 +57,21 @@ export const productSchema = z.object({
     .nullable(),
 
   // Naira, as typed. Converted to kobo before it reaches the service.
-  sellingPrice: z
-    .number({ error: "Enter a selling price" })
-    .positive("The selling price must be greater than zero")
+  // Three tiers: a distributor, a shop and a walk-in customer each pay a
+  // different price for the same pack.
+  priceWholesale: z
+    .number({ error: "Enter a wholesale price" })
+    .positive("The wholesale price must be greater than zero")
+    .max(10_000_000, "That price looks too high — check the amount"),
+
+  priceRetail: z
+    .number({ error: "Enter a retail price" })
+    .positive("The retail price must be greater than zero")
+    .max(10_000_000, "That price looks too high — check the amount"),
+
+  priceConsumer: z
+    .number({ error: "Enter a consumer price" })
+    .positive("The consumer price must be greater than zero")
     .max(10_000_000, "That price looks too high — check the amount"),
 
   minimumStockLevel: z

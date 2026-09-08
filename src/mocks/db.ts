@@ -27,8 +27,11 @@ import type {
   Category,
   InventoryItem,
   MovementType,
+  Customer,
+  CustomerLedgerEntry,
   PaymentMethod,
   PharmacySettings,
+  PriceTier,
   Product,
   Sale,
   SaleItem,
@@ -105,6 +108,8 @@ interface Database {
   returns: SaleReturn[];
   auditLogs: AuditLog[];
   terminals: Terminal[];
+  customers: Customer[];
+  customerLedger: CustomerLedgerEntry[];
   settings: PharmacySettings;
   receiptSequence: number;
 }
@@ -202,7 +207,9 @@ function seedDatabase(): Database {
     category: categoryById.get(seed.categoryId) ?? null,
     strength: seed.strength,
     dosageForm: seed.dosageForm,
-    sellingPrice: seed.sellingPrice,
+    priceWholesale: seed.priceWholesale,
+    priceRetail: seed.priceRetail,
+    priceConsumer: seed.priceConsumer,
     minimumStockLevel: seed.minimumStockLevel,
     unitType: seed.unitType,
     isActive: seed.isActive,
@@ -235,7 +242,7 @@ function seedDatabase(): Database {
         quantityReceived: received,
         quantityRemaining: remaining,
         costPrice,
-        sellingPrice: product.sellingPrice,
+        sellingPrice: product.priceConsumer,
         supplierName: pick(SEED_SUPPLIERS),
         receivedAt: isoDaysAgo(receivedDaysAgo),
         receivedBy: admin.id,
@@ -287,6 +294,9 @@ function seedDatabase(): Database {
       lowStockAlertsEnabled: true,
       expiryAlertDays: 90,
     },
+    // A fresh shop has no accounts on the book yet.
+    customers: [],
+    customerLedger: [],
     receiptSequence: 0,
   };
 
@@ -396,6 +406,12 @@ function seedSalesHistory(database: Database) {
         discount: 0,
         total: subtotal,
         paymentMethod: pick(paymentMethods),
+        priceTier: "CONSUMER" as const,
+        customerId: null,
+        customerName: null,
+        debtCharged: 0,
+        debtRepaid: 0,
+        customerBalanceAfter: null,
         amountReceived: null,
         changeGiven: null,
         status: "COMPLETED",
@@ -451,9 +467,9 @@ function seedAuditHistory(database: Database) {
       entityType,
       entityId: null,
       oldValue:
-        action === "PRICE_CHANGED" ? { sellingPrice: nairaToKobo(700) } : null,
+        action === "PRICE_CHANGED" ? { priceConsumer: nairaToKobo(700) } : null,
       newValue:
-        action === "PRICE_CHANGED" ? { sellingPrice: nairaToKobo(800) } : null,
+        action === "PRICE_CHANGED" ? { priceConsumer: nairaToKobo(800) } : null,
       createdAt: isoDaysAgo(daysAgo, randomInt(8, 17), randomInt(0, 59)),
     });
   }
@@ -662,6 +678,10 @@ export interface CompleteSaleInput {
   lines: CompleteSaleLine[];
   discount: Money;
   paymentMethod: PaymentMethod;
+  /** Which price list to charge. Defaults to the walk-in consumer price. */
+  priceTier?: PriceTier;
+  /** Attaching an account lets an underpayment become debt. */
+  customerId?: string | null;
   amountReceived: Money | null;
   cashierId: string;
   terminalId: string;
@@ -717,8 +737,8 @@ export function completeSale(input: CompleteSaleInput): Sale {
         quantity: allocation.quantity,
         // Price at the moment of sale — a later price change must not
         // rewrite this receipt.
-        unitPrice: product.sellingPrice,
-        subtotal: product.sellingPrice * allocation.quantity,
+        unitPrice: product.priceConsumer,
+        subtotal: product.priceConsumer * allocation.quantity,
         returnedQuantity: 0,
       });
 
@@ -765,6 +785,12 @@ export function completeSale(input: CompleteSaleInput): Sale {
     discount: input.discount,
     total,
     paymentMethod: input.paymentMethod,
+    priceTier: input.priceTier ?? "CONSUMER",
+    customerId: null,
+    customerName: null,
+    debtCharged: 0,
+    debtRepaid: 0,
+    customerBalanceAfter: null,
     amountReceived: input.amountReceived,
     changeGiven:
       input.paymentMethod === "CASH" && input.amountReceived !== null
@@ -863,9 +889,10 @@ export function receiveStock(input: ReceiveStockInput): Batch {
 
   // Selling price changes propagate to the product catalogue, and are audited
   // separately because a price change is a tracked action in its own right.
-  if (input.sellingPrice !== product.sellingPrice) {
-    const previous = product.sellingPrice;
-    product.sellingPrice = input.sellingPrice;
+  // Receiving quotes one figure, and that figure is the walk-in price.
+  if (input.sellingPrice !== product.priceConsumer) {
+    const previous = product.priceConsumer;
+    product.priceConsumer = input.sellingPrice;
     product.updatedAt = new Date().toISOString();
     recordAudit({
       userId: user.id,
@@ -873,8 +900,8 @@ export function receiveStock(input: ReceiveStockInput): Batch {
       action: "PRICE_CHANGED",
       entityType: "PRODUCT",
       entityId: product.id,
-      oldValue: { sellingPrice: previous },
-      newValue: { sellingPrice: input.sellingPrice },
+      oldValue: { priceConsumer: previous },
+      newValue: { priceConsumer: input.sellingPrice },
     });
   }
 

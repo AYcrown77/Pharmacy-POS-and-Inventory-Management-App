@@ -286,6 +286,18 @@ export const UNIT_TYPE_LABELS: Record<UnitType, string> = {
   PIECE: "Piece",
 };
 
+/**
+ * The unit a quantity is counted in, ready to sit beside a number.
+ *
+ * A cashier reading "70 available" cannot tell whether that is seventy tablets
+ * or seventy cartons of them, which is the difference between a sensible sale
+ * and a wrong one. Every label pluralises with a plain -s.
+ */
+export function unitLabel(quantity: number, unitType: UnitType): string {
+  const singular = UNIT_TYPE_LABELS[unitType].toLowerCase();
+  return Math.abs(quantity) === 1 ? singular : `${singular}s`;
+}
+
 export const UNIT_TYPES: readonly UnitType[] = [
   "PACK",
   "BOTTLE",

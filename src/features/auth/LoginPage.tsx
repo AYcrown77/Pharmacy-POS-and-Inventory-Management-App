@@ -52,8 +52,13 @@ export function LoginPage() {
   async function onSubmit(values: LoginValues) {
     setFormError(null);
     try {
-      setTerminalId(values.terminalId);
       const session = await login(values);
+
+      // Only remembered once the server has accepted it. Persisting before
+      // the call meant a refused sign-in — a cashier picking the admin
+      // terminal, say — still left the machine set to the wrong terminal.
+      setTerminalId(values.terminalId);
+
       router.replace(
         session.user.role === "CASHIER" ? "/pos" : "/dashboard",
       );

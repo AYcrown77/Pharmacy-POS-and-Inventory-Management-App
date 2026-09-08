@@ -3,7 +3,8 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { Controller, useForm } from "react-hook-form";
-import { Save } from "lucide-react";
+import { useState } from "react";
+import { Save, ScanLine, Sparkles } from "lucide-react";
 
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
@@ -14,7 +15,9 @@ import {
   FormSection,
 } from "@/components/ui/FormField";
 import { Input, NativeSelect } from "@/components/ui/Input";
+import { generateUniqueBarcode } from "@/lib/barcode";
 import { koboToNaira, nairaToKobo } from "@/lib/money";
+import { productsService } from "@/services/products.service";
 import {
   DOSAGE_FORM_LABELS,
   DOSAGE_FORMS,
@@ -50,6 +53,10 @@ export function ProductForm({
     register,
     handleSubmit,
     control,
+    setValue,
+    setFocus,
+    setError,
+    clearErrors,
     formState: { errors, isDirty },
   } = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -59,11 +66,13 @@ export function ProductForm({
           genericName: product.genericName,
           brandName: product.brandName,
           barcode: product.barcode,
-          categoryId: product.categoryId,
+          categoryName: product.category?.name ?? "",
           strength: product.strength,
           dosageForm: product.dosageForm ?? "",
           // Prices are stored in kobo; the form works in naira.
-          sellingPrice: koboToNaira(product.sellingPrice),
+          priceWholesale: koboToNaira(product.priceWholesale),
+          priceRetail: koboToNaira(product.priceRetail),
+          priceConsumer: koboToNaira(product.priceConsumer),
           minimumStockLevel: product.minimumStockLevel,
           unitType: product.unitType,
           isActive: product.isActive,
@@ -73,22 +82,83 @@ export function ProductForm({
           genericName: null,
           brandName: null,
           barcode: null,
-          categoryId: "",
+          categoryName: "",
           strength: null,
           dosageForm: "",
-          sellingPrice: undefined,
+          priceWholesale: undefined,
+          priceRetail: undefined,
+          priceConsumer: undefined,
           minimumStockLevel: 10,
           unitType: "PACK",
           isActive: true,
         },
   });
 
+  const [generating, setGenerating] = useState(false);
+
+  /**
+   * Mints a code for a product that has none.
+   *
+   * Uniqueness is checked against the catalogue as it goes, so the number that
+   * lands in the field is already free. The server still rejects duplicates on
+   * save — this only saves the admin from being told so after filling in the
+   * rest of the form.
+   */
+  async function generateBarcode() {
+    setGenerating(true);
+    clearErrors("barcode");
+    try {
+      const barcode = await generateUniqueBarcode(async (candidate) =>
+        Boolean(await productsService.getByBarcode(candidate)),
+      );
+      setValue("barcode", barcode, { shouldDirty: true, shouldValidate: true });
+    } catch (error) {
+      setError("barcode", {
+        message:
+          error instanceof Error
+            ? error.message
+            : "Could not generate a barcode.",
+      });
+    } finally {
+      setGenerating(false);
+    }
+  }
+
   async function submit(values: ProductFormValues) {
     const parsed = productSchema.parse(values);
+
+    // The API stores a category id; the form collects a name. An exact match
+    // (case-insensitive) reuses the existing category rather than creating a
+    // near-duplicate — "Antibiotics" and "antibiotics" must not become two.
+    const typed = parsed.categoryName.trim();
+    const existing = categories.find(
+      (category) => category.name.toLowerCase() === typed.toLowerCase(),
+    );
+
+    let categoryId = existing?.id;
+    if (!categoryId) {
+      const created = await productsService.createCategory(typed);
+      categoryId = created.id;
+    }
+
+    // Spelled out rather than spread: the form carries a category *name*
+    // that the API has no field for, and listing the payload keeps that
+    // boundary visible instead of relying on a rest-spread to drop it.
     await onSubmit({
-      ...parsed,
+      name: parsed.name,
+      genericName: parsed.genericName,
+      brandName: parsed.brandName,
+      barcode: parsed.barcode,
+      categoryId,
+      strength: parsed.strength,
+      dosageForm: parsed.dosageForm,
       // Back to integer kobo at the boundary — nothing downstream sees naira.
-      sellingPrice: nairaToKobo(parsed.sellingPrice),
+      priceWholesale: nairaToKobo(parsed.priceWholesale),
+      priceRetail: nairaToKobo(parsed.priceRetail),
+      priceConsumer: nairaToKobo(parsed.priceConsumer),
+      minimumStockLevel: parsed.minimumStockLevel,
+      unitType: parsed.unitType,
+      isActive: parsed.isActive,
     });
   }
 
@@ -141,30 +211,69 @@ export function ProductForm({
               <FormField
                 label="Barcode"
                 error={errors.barcode?.message}
-                hint="Scan into this field, or leave empty for loose items."
+                hint="Scan the pack, or generate a code for an item that has none."
               >
                 {(ids) => (
-                  <Input
-                    {...ids}
-                    {...register("barcode")}
-                    inputMode="numeric"
-                    autoComplete="off"
-                    placeholder="e.g. 6151234567890"
-                    className="font-mono"
-                  />
+                  <div className="flex items-start gap-2">
+                    <Input
+                      {...ids}
+                      {...register("barcode")}
+                      inputMode="numeric"
+                      autoComplete="off"
+                      placeholder="e.g. 6151234567890"
+                      className="font-mono"
+                    />
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="md"
+                      // Focusing the field is the whole of "scan": a scanner is
+                      // a keyboard, so it types into whatever has focus.
+                      onClick={() => setFocus("barcode")}
+                      leadingIcon={<ScanLine className="size-4" />}
+                      className="shrink-0"
+                    >
+                      Scan
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="md"
+                      loading={generating}
+                      onClick={() => void generateBarcode()}
+                      leadingIcon={<Sparkles className="size-4" />}
+                      className="shrink-0"
+                    >
+                      Generate
+                    </Button>
+                  </div>
                 )}
               </FormField>
 
-              <FormField label="Category" error={errors.categoryId?.message} required>
+              <FormField
+                label="Category"
+                error={errors.categoryName?.message}
+                required
+                hint="Pick one, or type a new category to create it."
+              >
                 {(ids) => (
-                  <NativeSelect {...ids} {...register("categoryId")}>
-                    <option value="">Choose a category</option>
-                    {categories.map((category) => (
-                      <option key={category.id} value={category.id}>
-                        {category.name}
-                      </option>
-                    ))}
-                  </NativeSelect>
+                  <>
+                    <Input
+                      {...ids}
+                      {...register("categoryName")}
+                      list="product-category-options"
+                      autoComplete="off"
+                      placeholder="e.g. Antibiotics"
+                    />
+                    {/* A datalist keeps the field a plain text input — it
+                        suggests without constraining, which is what lets a
+                        new category be typed straight in. */}
+                    <datalist id="product-category-options">
+                      {categories.map((category) => (
+                        <option key={category.id} value={category.name} />
+                      ))}
+                    </datalist>
+                  </>
                 )}
               </FormField>
             </FormGrid>
@@ -218,25 +327,37 @@ export function ProductForm({
             description="Cost price and quantity are recorded per batch when stock is received."
           >
             <FormGrid columns={3}>
-              <FormField
-                label="Selling price"
-                error={errors.sellingPrice?.message}
-                required
-                hint="Price per unit, in naira."
-              >
-                {(ids) => (
-                  <Input
-                    {...ids}
-                    {...register("sellingPrice", { valueAsNumber: true })}
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    inputMode="decimal"
-                    placeholder="0.00"
-                    className="num"
-                  />
-                )}
-              </FormField>
+              {/* Three prices for the same pack. Consumer is the walk-in
+                  price and the one the till starts on; the other two are what
+                  trade buyers pay. */}
+              {(
+                [
+                  ["priceWholesale", "Wholesale price", "Distributors and bulk buyers."],
+                  ["priceRetail", "Retail price", "Shops buying to resell."],
+                  ["priceConsumer", "Consumer price", "Walk-in customers. Used by default at the till."],
+                ] as const
+              ).map(([field, label, hint]) => (
+                <FormField
+                  key={field}
+                  label={label}
+                  error={errors[field]?.message}
+                  required
+                  hint={hint}
+                >
+                  {(ids) => (
+                    <Input
+                      {...ids}
+                      {...register(field, { valueAsNumber: true })}
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      className="num"
+                    />
+                  )}
+                </FormField>
+              ))}
 
               <FormField
                 label="Minimum stock level"

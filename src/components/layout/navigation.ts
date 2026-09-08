@@ -1,4 +1,5 @@
 import {
+  Users2,
   Activity,
   AlertTriangle,
   Boxes,
@@ -53,6 +54,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/pos", label: "POS / New Sale", icon: ScanBarcode, permission: "pos:use" },
       { href: "/sales", label: "Sales", icon: Receipt, permission: "sales:read:own" },
       { href: "/returns", label: "Returns", icon: RotateCcw, permission: "sales:refund" },
+      { href: "/customers", label: "Customers", icon: Users2, permission: "customers:manage" },
     ],
   },
   {

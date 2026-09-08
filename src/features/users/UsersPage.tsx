@@ -284,8 +284,12 @@ export function UsersPage() {
         onOpenChange={(open) => !open && setResetting(null)}
         user={resetting}
         isSubmitting={resetPassword.isPending}
-        onSubmit={(password) =>
-          resetPassword.mutateAsync({ id: resetting!.id, password })
+        onSubmit={(password, currentPassword) =>
+          resetPassword.mutateAsync({
+            id: resetting!.id,
+            password,
+            currentPassword,
+          })
         }
       />
 

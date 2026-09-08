@@ -115,8 +115,16 @@ export function useResetPassword() {
   const invalidate = useAfterUserChange();
 
   return useMutation({
-    mutationFn: ({ id, password }: { id: string; password: string }) =>
-      usersService.resetPassword(id, password, user?.id ?? ""),
+    mutationFn: ({
+      id,
+      password,
+      currentPassword,
+    }: {
+      id: string;
+      password: string;
+      currentPassword: string;
+    }) =>
+      usersService.resetPassword(id, password, currentPassword, user?.id ?? ""),
     onSuccess: () => {
       invalidate();
       toast({
