@@ -37,6 +37,7 @@ export function PrintLabelDialog({
   const clamped = Math.min(Math.max(copies || 1, 1), MAX_COPIES);
 
   return (
+    <>
     <Modal
       open={open}
       onOpenChange={onOpenChange}
@@ -92,14 +93,22 @@ export function PrintLabelDialog({
         </div>
       </div>
 
-      {/* Off-screen, and the only thing the print stylesheet reveals. */}
-      <div className="pointer-events-none fixed left-[-200vw] top-0">
+    </Modal>
+
+      {/*
+        Rendered beside the dialog, never inside it. The dialog is
+        position:fixed, so an absolutely positioned print root within it would
+        resolve against the dialog box rather than the page — which is exactly
+        how the label ended up off the sheet. Only mounted while the dialog is
+        open, so nothing invisible is left in the tree.
+      */}
+      {open && (
         <ProductLabelStrip
           product={product}
           copies={clamped}
           settings={settings.data}
         />
-      </div>
-    </Modal>
+      )}
+    </>
   );
 }

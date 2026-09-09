@@ -300,7 +300,12 @@ export function StockReceivingPage() {
                     required
                     hint={
                       product
-                        ? `In ${product.unitType.toLowerCase()}s`
+                        ? product.unitsPerPack > 1
+                          // The shelf is counted in singles, so a delivery is
+                          // too. Saying "in packs" here — which the packaging
+                          // type would — would have stock recorded 24x short.
+                          ? `In single units. A pack of ${product.unitsPerPack} counts as ${product.unitsPerPack}.`
+                          : `In ${product.unitType.toLowerCase()}s`
                         : undefined
                     }
                   >
@@ -330,7 +335,7 @@ export function StockReceivingPage() {
                     label="Cost price"
                     error={errors.costPrice?.message}
                     required
-                    hint="What the pharmacy paid, per unit."
+                    hint="What the pharmacy paid, per single unit."
                   >
                     {(ids) => (
                       <Input
@@ -347,13 +352,13 @@ export function StockReceivingPage() {
                   </FormField>
 
                   <FormField
-                    label="Selling price"
+                    label="Selling price (each)"
                     error={errors.sellingPrice?.message}
                     required
                     hint={
                       margin !== null
-                        ? `Margin ${margin.toFixed(1)}%`
-                        : "Defaults to the product's current price."
+                        ? `Margin ${margin.toFixed(1)}% — per single unit`
+                        : "The walk-in price, per single unit."
                     }
                   >
                     {(ids) => (

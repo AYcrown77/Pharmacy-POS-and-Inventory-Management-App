@@ -66,7 +66,17 @@ export function ProductLabelStrip({
   settings?: PharmacySettings | undefined;
 }) {
   return (
-    <div data-print-root="labels" className="bg-white">
+    <div
+      data-print-root="labels"
+      aria-hidden
+      // Off-screen on a monitor, and — critically — the positioning lives on
+      // the print root itself rather than a wrapper. The print rule overrides
+      // this element's `left` to 0 to pull it onto the page; if the offset sat
+      // on a parent instead, that parent would become the containing block and
+      // the label would still be rendered 200 viewport widths away, printing a
+      // blank sheet.
+      className="pointer-events-none fixed left-[-200vw] top-0 w-[var(--receipt-width)] bg-white"
+    >
       {Array.from({ length: Math.max(1, copies) }, (_, index) => (
         <ProductLabel key={index} product={product} settings={settings} />
       ))}
