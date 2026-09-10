@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { DOSAGE_FORMS, UNIT_TYPES } from "@/lib/status";
+import { DOSAGE_FORMS, GROUPING_UNIT_TYPES, UNIT_TYPES } from "@/lib/status";
 import type { DosageForm, UnitType } from "@/types/domain";
 
 /**
@@ -16,6 +16,14 @@ const optionalText = z
   .trim()
   .transform((value) => (value === "" ? null : value))
   .nullable();
+
+/**
+ * "One unit of stock is a pack" and "24 in a pack" cannot both be true —
+ * stock would be counted in the wrong thing. Shared with the form, which shows
+ * it as the two fields are filled in rather than only on save.
+ */
+export const PACK_BASE_UNIT_MESSAGE =
+  "It comes in packs of more than one, so choose what one of them is — such as Tablet or Sachet";
 
 export const productSchema = z.object({
   name: z
@@ -57,8 +65,9 @@ export const productSchema = z.object({
     .nullable(),
 
   // Naira, as typed. Converted to kobo before it reaches the service.
-  // Three tiers: a distributor, a shop and a walk-in customer each pay a
-  // different price for the same pack.
+  // Three tiers — a distributor, a shop and a walk-in customer — and every
+  // one is the price of a single base unit. A pack is never priced on its
+  // own: it is always the unit price times the pack size.
   priceWholesale: z
     .number({ error: "Enter a wholesale price" })
     .positive("The wholesale price must be greater than zero")
@@ -75,8 +84,8 @@ export const productSchema = z.object({
     .max(10_000_000, "That price looks too high — check the amount"),
 
   /**
-   * Retail and wholesale are priced per pack, so this is what turns a pack
-   * price into a stock movement. 1 for anything sold whole.
+   * How many base units make a pack. Turns a pack sale into a stock movement
+   * and a unit price into a pack price. 1 for anything only ever sold whole.
    */
   unitsPerPack: z
     .number({ error: "Enter how many units are in a pack" })
@@ -93,6 +102,14 @@ export const productSchema = z.object({
   unitType: z.enum(UNIT_TYPES as unknown as [UnitType, ...UnitType[]]),
 
   isActive: z.boolean(),
+}).superRefine((value, ctx) => {
+  if (value.unitsPerPack > 1 && GROUPING_UNIT_TYPES.includes(value.unitType)) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["unitType"],
+      message: PACK_BASE_UNIT_MESSAGE,
+    });
+  }
 });
 
 export type ProductFormValues = z.input<typeof productSchema>;

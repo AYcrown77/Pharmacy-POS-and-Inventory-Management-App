@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { useState } from "react";
 import { Save, ScanLine, Sparkles } from "lucide-react";
 
@@ -16,17 +16,22 @@ import {
 } from "@/components/ui/FormField";
 import { Input, NativeSelect } from "@/components/ui/Input";
 import { generateUniqueBarcode } from "@/lib/barcode";
-import { koboToNaira, nairaToKobo } from "@/lib/money";
+import { formatMoney, koboToNaira, nairaToKobo } from "@/lib/money";
 import { productsService } from "@/services/products.service";
 import {
   DOSAGE_FORM_LABELS,
   DOSAGE_FORMS,
+  GROUPING_UNIT_TYPES,
   UNIT_TYPE_LABELS,
   UNIT_TYPES,
 } from "@/lib/status";
 import type { ProductInput } from "@/services/products.service";
 import type { Category, Product } from "@/types/domain";
-import { productSchema, type ProductFormValues } from "../schema";
+import {
+  PACK_BASE_UNIT_MESSAGE,
+  productSchema,
+  type ProductFormValues,
+} from "../schema";
 
 /**
  * One form for creating and editing.
@@ -95,6 +100,20 @@ export function ProductForm({
           isActive: true,
         },
   });
+
+  // Watched so the labels, and the pack prices worked out from them, follow
+  // what is being typed rather than what was last saved.
+  const unitType = useWatch({ control, name: "unitType" });
+  const unitsPerPack = useWatch({ control, name: "unitsPerPack" });
+  const [wholesale, retail, consumer] = useWatch({
+    control,
+    name: ["priceWholesale", "priceRetail", "priceConsumer"],
+  });
+
+  const baseUnit = (UNIT_TYPE_LABELS[unitType] ?? "unit").toLowerCase();
+  const packSize =
+    Number.isInteger(unitsPerPack) && unitsPerPack > 1 ? unitsPerPack : 1;
+  const packConflict = packSize > 1 && GROUPING_UNIT_TYPES.includes(unitType);
 
   const [generating, setGenerating] = useState(false);
 
@@ -286,7 +305,7 @@ export function ProductForm({
             title="Presentation"
             description="How the medicine is supplied and sold."
           >
-            <FormGrid columns={3}>
+            <FormGrid columns={2}>
               <FormField label="Strength" error={errors.strength?.message}>
                 {(ids) => (
                   <Input {...ids} {...register("strength")} placeholder="e.g. 500mg" />
@@ -307,10 +326,13 @@ export function ProductForm({
               </FormField>
 
               <FormField
-                label="Unit type"
-                error={errors.unitType?.message}
+                label="Base unit"
+                error={
+                  errors.unitType?.message ??
+                  (packConflict ? PACK_BASE_UNIT_MESSAGE : undefined)
+                }
                 required
-                hint="What one unit of stock represents."
+                hint="The smallest thing you sell. Stock is counted in these, and every price is for one."
               >
                 {(ids) => (
                   <NativeSelect {...ids} {...register("unitType")}>
@@ -322,6 +344,29 @@ export function ProductForm({
                   </NativeSelect>
                 )}
               </FormField>
+
+              <FormField
+                label="Units per pack"
+                error={errors.unitsPerPack?.message}
+                required
+                hint={
+                  packSize > 1
+                    ? `1 pack = ${packSize} ${baseUnit}s. The till can sell either.`
+                    : "How many are in a pack. Use 1 if it is only ever sold whole."
+                }
+              >
+                {(ids) => (
+                  <Input
+                    {...ids}
+                    {...register("unitsPerPack", { valueAsNumber: true })}
+                    type="number"
+                    step="1"
+                    min="1"
+                    inputMode="numeric"
+                    className="num"
+                  />
+                )}
+              </FormField>
             </FormGrid>
           </FormSection>
 
@@ -330,19 +375,19 @@ export function ProductForm({
             description="Cost price and quantity are recorded per batch when stock is received."
           >
             <FormGrid columns={3}>
-              {/* Three prices for the same pack. Consumer is the walk-in
-                  price and the one the till starts on; the other two are what
-                  trade buyers pay. */}
+              {/* Three prices, each for ONE base unit. A trade discount is a
+                  lower unit price, never a separately typed pack price — so a
+                  pack can never drift from what its own singles add up to. */}
               {(
                 [
-                  ["priceWholesale", "Wholesale price (per pack)", "Distributors and bulk buyers."],
-                  ["priceRetail", "Retail price (per pack)", "Shops buying to resell."],
-                  ["priceConsumer", "Consumer price (each)", "Walk-in customers. Charged per single unit."],
+                  ["priceWholesale", "Wholesale", "Distributors and bulk buyers."],
+                  ["priceRetail", "Retail", "Shops buying to resell."],
+                  ["priceConsumer", "Consumer", "Walk-in customers. The till starts here."],
                 ] as const
-              ).map(([field, label, hint]) => (
+              ).map(([field, tier, hint]) => (
                 <FormField
                   key={field}
-                  label={label}
+                  label={`${tier} price (per ${baseUnit})`}
                   error={errors[field]?.message}
                   required
                   hint={hint}
@@ -362,30 +407,41 @@ export function ProductForm({
                 </FormField>
               ))}
 
-              <FormField
-                label="Units per pack"
-                error={errors.unitsPerPack?.message}
-                required
-                hint="How many singles are in a pack. Use 1 if it is sold whole."
-              >
-                {(ids) => (
-                  <Input
-                    {...ids}
-                    {...register("unitsPerPack", { valueAsNumber: true })}
-                    type="number"
-                    step="1"
-                    min="1"
-                    inputMode="numeric"
-                    className="num"
-                  />
-                )}
-              </FormField>
+              {/* Worked out, never typed: what a whole pack comes to at each
+                  tier — exactly what the till charges for one. */}
+              {packSize > 1 && (
+                <div className="col-span-full rounded-md bg-neutral-50 px-4 py-3 ring-1 ring-inset ring-neutral-200">
+                  <p className="text-meta text-neutral-500">
+                    A pack of {packSize} {baseUnit}s comes to
+                  </p>
+                  <dl className="mt-1.5 grid grid-cols-3 gap-4">
+                    {(
+                      [
+                        ["Wholesale", wholesale],
+                        ["Retail", retail],
+                        ["Consumer", consumer],
+                      ] as const
+                    ).map(([tier, price]) => (
+                      <div key={tier} className="min-w-0">
+                        <dt className="text-micro font-medium uppercase tracking-wide text-neutral-500">
+                          {tier}
+                        </dt>
+                        <dd className="num truncate text-base font-semibold text-neutral-900">
+                          {Number.isFinite(price) && price > 0
+                            ? formatMoney(nairaToKobo(price) * packSize)
+                            : "—"}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              )}
 
               <FormField
                 label="Minimum stock level"
                 error={errors.minimumStockLevel?.message}
                 required
-                hint="Triggers the low-stock alert."
+                hint={`Counted in ${baseUnit}s. Triggers the low-stock alert.`}
               >
                 {(ids) => (
                   <Input

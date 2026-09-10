@@ -180,6 +180,10 @@ export const ScanBar = forwardRef<HTMLInputElement, ScanBarProps>(
                     <span className="num shrink-0 text-right">
                       <span className="block text-base font-semibold text-neutral-900">
                         {formatMoney(product.priceConsumer)}
+                        <span className="text-meta font-normal text-neutral-500">
+                          {" "}
+                          / {unitLabel(1, product.unitType)}
+                        </span>
                       </span>
                       <span
                         className={cn(
@@ -194,7 +198,7 @@ export const ScanBar = forwardRef<HTMLInputElement, ScanBarProps>(
                           : `${formatQuantity(product.availableStock)} ${unitLabel(
                               product.availableStock,
                               product.unitType,
-                            )} available`}
+                            )} available${product.unitsPerPack > 1 ? ` · pack of ${formatQuantity(product.unitsPerPack)}` : ""}`}
                       </span>
                     </span>
                   </button>

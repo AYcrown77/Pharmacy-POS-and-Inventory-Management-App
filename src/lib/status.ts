@@ -279,6 +279,7 @@ export const UNIT_TYPE_LABELS: Record<UnitType, string> = {
   PACK: "Pack",
   BOTTLE: "Bottle",
   TABLET: "Tablet",
+  CAPSULE: "Capsule",
   SACHET: "Sachet",
   TUBE: "Tube",
   VIAL: "Vial",
@@ -302,12 +303,20 @@ export const UNIT_TYPES: readonly UnitType[] = [
   "PACK",
   "BOTTLE",
   "TABLET",
+  "CAPSULE",
   "SACHET",
   "TUBE",
   "VIAL",
   "CARTON",
   "PIECE",
 ];
+
+/**
+ * Units that are themselves a grouping of something else. A product that
+ * comes in packs of more than one cannot have one of these as its base unit —
+ * the base unit has to be what ONE of them is.
+ */
+export const GROUPING_UNIT_TYPES: readonly UnitType[] = ["PACK", "CARTON"];
 
 export const DOSAGE_FORM_LABELS: Record<DosageForm, string> = {
   TABLET: "Tablet",

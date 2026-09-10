@@ -24,18 +24,24 @@ import {
  * session at this till, and should not outlive it.
  */
 
-const DRAFT_KEY = "mhp.pos.draft";
+// Versioned with the shape of a cart line. A draft from before units were
+// chosen per line would restore lines with no unit and no per-unit prices, so
+// a new key simply leaves it behind.
+const DRAFT_KEY = "mhp.pos.draft.v2";
 
 function loadDraft(): CartState {
   try {
     const raw = window.sessionStorage.getItem(DRAFT_KEY);
     if (!raw) return emptyCart;
 
-    const parsed = JSON.parse(raw) as CartState;
-    // Tolerate a draft written by an older build rather than crashing the till.
-    if (!Array.isArray(parsed.lines)) return emptyCart;
+    const parsed = JSON.parse(raw) as Partial<CartState>;
+    // Tolerate a draft written by another build rather than crashing the till.
+    const usable =
+      Array.isArray(parsed.lines) &&
+      parsed.lines.every((line) => typeof line?.key === "string" && line.unitPrices);
+    if (!usable) return emptyCart;
 
-    return { ...emptyCart, ...parsed, lastTouchedProductId: null };
+    return { ...emptyCart, ...parsed, lastTouchedKey: null };
   } catch {
     return emptyCart;
   }

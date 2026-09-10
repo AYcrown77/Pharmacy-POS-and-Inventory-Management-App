@@ -76,7 +76,10 @@ export function ReceiptDocument({
             <p className="break-words">{item.productName}</p>
             <div className="flex justify-between gap-1.5 tabular-nums">
               <span>
-                {formatQuantity(item.quantity)} x {formatMoney(item.unitPrice)}
+                {formatQuantity(item.quantity)}
+                {item.unitsPerSaleUnit > 1 &&
+                  ` ${item.quantity === 1 ? "pack" : "packs"} of ${item.unitsPerSaleUnit}`}{" "}
+                x {formatMoney(item.unitPrice)}
               </span>
               <span className="shrink-0">{formatMoney(item.subtotal)}</span>
             </div>

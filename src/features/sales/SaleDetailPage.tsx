@@ -160,6 +160,12 @@ export function SaleDetailPage({ saleId }: { saleId: string }) {
 
                     <span className="num text-right text-base text-neutral-900">
                       {formatQuantity(item.quantity)}
+                      {item.unitsPerSaleUnit > 1 && (
+                        <span className="block text-micro text-neutral-500">
+                          {item.quantity === 1 ? "pack" : "packs"} of{" "}
+                          {item.unitsPerSaleUnit}
+                        </span>
+                      )}
                     </span>
 
                     <span className="num text-right text-base text-neutral-600">

@@ -37,6 +37,7 @@ import type {
   SaleItem,
   SaleReturn,
   SaleStatus,
+  SaleUnit,
   StockAdjustment,
   StockMovement,
   Terminal,
@@ -674,6 +675,8 @@ export function recordAudit(input: {
 export interface CompleteSaleLine {
   productId: string;
   quantity: number;
+  /** Singles or whole packs. Singles when omitted. */
+  unit?: SaleUnit;
 }
 
 export interface CompleteSaleInput {
@@ -704,11 +707,24 @@ export function completeSale(input: CompleteSaleInput): Sale {
 
   const terminal = db.terminals.find((item) => item.id === input.terminalId);
 
-  // Plan every line first. A shortfall throws before anything is mutated.
-  const planned = input.lines.map((line) => ({
-    line,
-    allocations: planFefoAllocation(line.productId, line.quantity),
-    product: db.products.find((product) => product.id === line.productId),
+  // Plan every product first. A shortfall throws before anything is mutated.
+  // The mock keeps sale items in base units, so a pack is planned as the
+  // tablets it holds — and a product sold as packs and singles is planned once,
+  // so the two lines cannot both claim the same stock.
+  const wanted = new Map<string, number>();
+  for (const line of input.lines) {
+    const product = db.products.find((item) => item.id === line.productId);
+    const perUnit =
+      line.unit === "PACK" && product ? Math.max(product.unitsPerPack, 1) : 1;
+    wanted.set(
+      line.productId,
+      (wanted.get(line.productId) ?? 0) + line.quantity * perUnit,
+    );
+  }
+
+  const planned = [...wanted].map(([productId, baseUnits]) => ({
+    allocations: planFefoAllocation(productId, baseUnits),
+    product: db.products.find((product) => product.id === productId),
   }));
 
   const missing = planned.find((entry) => !entry.product);

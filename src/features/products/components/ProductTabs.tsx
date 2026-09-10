@@ -78,7 +78,13 @@ export function ProductOverviewTab({
           size="sm"
           label="Selling price"
           value={formatMoney(product.priceConsumer)}
-          context={`Per ${UNIT_TYPE_LABELS[product.unitType].toLowerCase()}`}
+          context={
+            product.unitsPerPack > 1
+              ? `Per ${UNIT_TYPE_LABELS[product.unitType].toLowerCase()} · ${formatMoney(
+                  product.priceConsumer * product.unitsPerPack,
+                )} a pack of ${product.unitsPerPack}`
+              : `Per ${UNIT_TYPE_LABELS[product.unitType].toLowerCase()}`
+          }
         />
         <StatCard
           size="sm"
@@ -118,8 +124,11 @@ export function ProductOverviewTab({
                   : null,
               },
               {
-                label: "Unit type",
-                value: UNIT_TYPE_LABELS[product.unitType],
+                label: "Base unit",
+                value:
+                  product.unitsPerPack > 1
+                    ? `${UNIT_TYPE_LABELS[product.unitType]} · ${product.unitsPerPack} to a pack`
+                    : UNIT_TYPE_LABELS[product.unitType],
               },
               {
                 label: "Barcode",

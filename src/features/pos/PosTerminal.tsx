@@ -14,10 +14,17 @@ import { useAuth } from "@/lib/auth/AuthProvider";
 import { formatQuantity } from "@/lib/money";
 import { printReceipt } from "@/lib/print";
 import { STOCK_AFFECTING_KEYS, salesKeys } from "@/lib/query/keys";
+import { unitLabel } from "@/lib/status";
 import { productsService, type SaleLookup } from "@/services/products.service";
 import { salesService } from "@/services/sales.service";
 import type { Money } from "@/types/common";
-import type { PaymentMethod, Sale, Customer } from "@/types/domain";
+import {
+  defaultUnitForTier,
+  type Customer,
+  type PaymentMethod,
+  type Sale,
+  type UnitType,
+} from "@/types/domain";
 import { CartTable } from "./components/CartTable";
 import { CompleteSaleDialog } from "./components/CompleteSaleDialog";
 import { CustomerPicker } from "./components/CustomerPicker";
@@ -31,7 +38,19 @@ type ScanNotice =
   | { kind: "NOT_FOUND"; query: string }
   | { kind: "OUT_OF_STOCK"; productName: string }
   | { kind: "EXPIRED_ONLY"; productName: string }
-  | { kind: "AT_CEILING"; productName: string; available: number };
+  | {
+      kind: "AT_CEILING";
+      productName: string;
+      available: number;
+      unitType: UnitType;
+    }
+  | {
+      kind: "PACK_UNAVAILABLE";
+      productName: string;
+      free: number;
+      unitsPerPack: number;
+      unitType: UnitType;
+    };
 
 export function PosTerminal() {
   const queryClient = useQueryClient();
@@ -107,20 +126,42 @@ export function PosTerminal() {
         return;
       }
 
-      // Already holding everything on the shelf.
-      const existing = cart.state.lines.find(
-        (line) => line.productId === result.product.id,
-      );
-      if (existing && existing.quantity >= result.availableStock) {
+      // What the cart already holds of this product, in base units, across
+      // every line — a box and a few loose tablets come off the same shelf.
+      const held = cart.state.lines
+        .filter((line) => line.productId === result.product.id)
+        .reduce((total, line) => total + line.quantity * line.unitsPerSaleUnit, 0);
+      const free = result.availableStock - held;
+
+      if (free < 1) {
         setNotice({
           kind: "AT_CEILING",
           productName: result.product.name,
           available: result.availableStock,
+          unitType: result.product.unitType,
         });
         return;
       }
 
-      cart.dispatch({ type: "ADD", lookup: result });
+      // The tier suggests the unit: a box for a trade buyer, a single for a
+      // walk-in. When a whole box is no longer on the shelf a single is still
+      // a sale, so one is added — and the cashier is told why.
+      const unitsPerPack = Math.max(result.product.unitsPerPack, 1);
+      const wantsPack =
+        unitsPerPack > 1 && defaultUnitForTier(cart.state.priceTier) === "PACK";
+      const unit = wantsPack && free >= unitsPerPack ? "PACK" : "SINGLE";
+
+      cart.dispatch({ type: "ADD", lookup: result, unit });
+
+      if (wantsPack && unit === "SINGLE") {
+        setNotice({
+          kind: "PACK_UNAVAILABLE",
+          productName: result.product.name,
+          free,
+          unitsPerPack,
+          unitType: result.product.unitType,
+        });
+      }
       setQuery("");
       focusScan();
     },
@@ -137,6 +178,7 @@ export function PosTerminal() {
         lines: cart.state.lines.map((line) => ({
           productId: line.productId,
           quantity: line.quantity,
+          unit: line.unit,
         })),
         discount: cart.state.discount,
         paymentMethod,
@@ -270,16 +312,17 @@ export function PosTerminal() {
 
         <CartTable
           lines={cart.state.lines}
-          lastTouchedProductId={cart.state.lastTouchedProductId}
-          onAdjustQuantity={(productId, delta) =>
-            cart.dispatch({ type: "ADJUST_QUANTITY", productId, delta })
+          lastTouchedKey={cart.state.lastTouchedKey}
+          onAdjustQuantity={(key, delta) =>
+            cart.dispatch({ type: "ADJUST_QUANTITY", key, delta })
           }
-          onSetQuantity={(productId, quantity) =>
-            cart.dispatch({ type: "SET_QUANTITY", productId, quantity })
+          onSetQuantity={(key, quantity) =>
+            cart.dispatch({ type: "SET_QUANTITY", key, quantity })
           }
-          onRemove={(productId) =>
-            cart.dispatch({ type: "REMOVE", productId })
+          onSetUnit={(key, unit) =>
+            cart.dispatch({ type: "SET_UNIT", key, unit })
           }
+          onRemove={(key) => cart.dispatch({ type: "REMOVE", key })}
           onFocusScan={focusScan}
           disabled={busy}
         />
@@ -405,7 +448,15 @@ function ScanNoticeAlert({
       title: "No more available",
       body:
         notice.kind === "AT_CEILING"
-          ? `The cart already holds all ${formatQuantity(notice.available)} available units of ${notice.productName}.`
+          ? `The cart already holds all ${formatQuantity(notice.available)} ${unitLabel(notice.available, notice.unitType)} of ${notice.productName} on the shelf.`
+          : "",
+    },
+    PACK_UNAVAILABLE: {
+      tone: "warning" as const,
+      title: "Added as a single",
+      body:
+        notice.kind === "PACK_UNAVAILABLE"
+          ? `Only ${formatQuantity(notice.free)} ${unitLabel(notice.free, notice.unitType)} of ${notice.productName} ${notice.free === 1 ? "is" : "are"} left — not enough for a pack of ${notice.unitsPerPack} — so one ${unitLabel(1, notice.unitType)} was added.`
           : "",
     },
   }[notice.kind];

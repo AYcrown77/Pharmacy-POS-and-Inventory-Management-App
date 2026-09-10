@@ -229,8 +229,10 @@ export function ReturnsPage() {
                       </p>
                       <p className="num truncate text-meta text-neutral-500">
                         {item.batchNumber} · sold{" "}
-                        {formatQuantity(item.quantity)} @{" "}
-                        {formatMoney(item.unitPrice)}
+                        {formatQuantity(item.quantity)}
+                        {item.unitsPerSaleUnit > 1 &&
+                          ` ${item.quantity === 1 ? "pack" : "packs"} of ${item.unitsPerSaleUnit}`}{" "}
+                        @ {formatMoney(item.unitPrice)}
                         {item.returnedQuantity > 0 &&
                           ` · ${formatQuantity(item.returnedQuantity)} already returned`}
                       </p>
@@ -388,6 +390,8 @@ export function ReturnsPage() {
                 >
                   <span className="min-w-0 truncate">
                     {formatQuantity(entry.quantity)} × {entry.item.productName}
+                    {entry.item.unitsPerSaleUnit > 1 &&
+                      ` (pack of ${entry.item.unitsPerSaleUnit})`}
                   </span>
                   <span className="num shrink-0 font-medium">
                     {formatMoney(entry.item.unitPrice * entry.quantity)}

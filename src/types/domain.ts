@@ -20,24 +20,31 @@ export type PaymentMethod = "CASH" | "CARD" | "TRANSFER";
 /**
  * The three prices a product carries.
  *
- * A pharmacy sells the same pack to a walk-in customer, a corner shop and a
- * distributor at different prices. The sale records which list it charged, so
- * a later price edit cannot change what an old receipt appears to have said.
+ * A pharmacy sells the same medicine to a walk-in customer, a corner shop and
+ * a distributor at different prices. Every tier is the price of ONE base unit
+ * — a tablet, a sachet — and a pack is always that price times the pack size,
+ * so a pack can never be priced out of line with its own singles. The sale
+ * records which list it charged, so a later price edit cannot change what an
+ * old receipt appears to have said.
  */
 export type PriceTier = "WHOLESALE" | "RETAIL" | "CONSUMER";
 
 /**
- * Which unit a tier trades in.
+ * How a cart line is counted: one base unit, or a whole pack of them.
  *
- * A walk-in buys a single; a shop or distributor buys the pack. The tier
- * decides both the price and what "1" means, so the two cannot drift apart.
- * Stock is always counted in singles — a pack sale just deducts more of them.
+ * Independent of the tier — a trade buyer can still take one loose sachet and
+ * a walk-in can still take a whole box. Stock is always counted in base units;
+ * a pack sale just deducts `unitsPerPack` of them.
  */
-export const TIER_SELLS_PACKS: Record<PriceTier, boolean> = {
-  WHOLESALE: true,
-  RETAIL: true,
-  CONSUMER: false,
-};
+export type SaleUnit = "SINGLE" | "PACK";
+
+/**
+ * The unit a tier starts on at the till: trade buyers usually take the box,
+ * walk-ins a few loose. Only a default — the cashier can change it per line.
+ */
+export function defaultUnitForTier(tier: PriceTier): SaleUnit {
+  return tier === "CONSUMER" ? "SINGLE" : "PACK";
+}
 
 export type SaleStatus = "COMPLETED" | "PARTIALLY_RETURNED" | "REVERSED";
 
@@ -89,6 +96,7 @@ export type UnitType =
   | "PACK"
   | "BOTTLE"
   | "TABLET"
+  | "CAPSULE"
   | "SACHET"
   | "TUBE"
   | "VIAL"
