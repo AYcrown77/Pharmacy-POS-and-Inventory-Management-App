@@ -7,6 +7,8 @@
  * `globals.css`.
  */
 
+import type { LabelSetup } from "./labels";
+
 /** Falls back to the 58mm roll if the stylesheet has not loaded yet. */
 const DEFAULT_RECEIPT_PAPER = "58mm";
 
@@ -60,12 +62,16 @@ export function printReport() {
 }
 
 /**
- * Print a strip of product labels.
+ * Print product labels on whatever stock the printer holds.
  *
- * Same roll as the receipt, so the same page rule — the labels are separated
- * by a cut line rather than by page breaks, because the printer feeds a
- * continuous roll and has no notion of a page.
+ * Stickers: the page *is* one sticker, so each label is its own page and the
+ * printer feeds sticker by sticker. The receipt roll has no pages, so labels
+ * run end to end under the receipt's page rule with a cut line between them.
  */
-export function printLabels() {
-  printWithPageRule(receiptPageRule());
+export function printLabels(setup: LabelSetup) {
+  printWithPageRule(
+    setup.kind === "STICKER"
+      ? `@page { size: ${setup.widthMm}mm ${setup.heightMm}mm; margin: 0; }`
+      : receiptPageRule(),
+  );
 }

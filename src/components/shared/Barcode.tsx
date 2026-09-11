@@ -1,77 +1,135 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import JsBarcode from "jsbarcode";
 
-/**
- * Code 128 covers printable ASCII and nothing else.
- *
- * Checked here rather than by catching a throw, so the decision is made during
- * render: setting state from an effect to report the failure afterwards would
- * render once with a barcode that is not there.
- */
+import { cn } from "@/lib/cn";
+import { QUIET_ZONE_MODULES } from "@/lib/labels";
+
+/** Code 128 covers printable ASCII and nothing else. */
 function isEncodable(value: string): boolean {
   return value.length > 0 && /^[\x20-\x7E]+$/.test(value);
 }
 
 /**
- * A scannable barcode, rendered as SVG.
+ * The Code 128 module pattern for a value — "1" a dark module, "0" a light
+ * one — or null when it cannot be encoded.
  *
  * **Code 128, always — deliberately, even for 13-digit codes that look like
- * EAN-13.** Most of the codes in this catalogue are not valid EAN-13: their
- * check digits do not compute. Asked to encode one as EAN-13, a generator
- * either refuses or silently substitutes the correct check digit, and then the
- * label scans back as a *different* number from the one stored against the
- * product. A label that does not scan is an annoyance; a label that scans as
- * the wrong product is a dispensing error. Code 128 encodes the string exactly
- * as given, so what is printed always matches what is in the database.
+ * EAN-13.** Many codes in the catalogue are not valid EAN-13: their check
+ * digits do not compute. Asked to encode one as EAN-13, a generator either
+ * refuses or silently substitutes the correct check digit, and the label then
+ * scans back as a *different* number from the one stored against the product.
+ * A label that does not scan is an annoyance; a label that scans as the wrong
+ * product is a dispensing error. Code 128 encodes the string exactly as given.
  *
- * SVG rather than canvas because a thermal head is coarse — 203dpi — and
- * vector bars stay sharp when the browser rasterises the page for printing.
+ * JsBarcode is asked for the encoding only, through its object renderer. Its
+ * own SVG sizes bars in CSS pixels, which land on fractional printer dots, so
+ * the bars are drawn here instead.
+ */
+export function code128Pattern(value: string): string | null {
+  if (!isEncodable(value)) return null;
+
+  const target: { encodings?: { data: string }[] } = {};
+  try {
+    JsBarcode(target, value, { format: "CODE128" });
+  } catch {
+    return null;
+  }
+
+  const pattern = target.encodings?.map((encoding) => encoding.data).join("") ?? "";
+  return pattern.length > 0 ? pattern : null;
+}
+
+/** Runs of dark modules, as x offset and width in modules. */
+function darkRuns(pattern: string): { x: number; width: number }[] {
+  const runs: { x: number; width: number }[] = [];
+  let start = -1;
+
+  for (let index = 0; index <= pattern.length; index += 1) {
+    const dark = pattern[index] === "1";
+    if (dark && start < 0) start = index;
+    if (!dark && start >= 0) {
+      runs.push({ x: start, width: index - start });
+      start = -1;
+    }
+  }
+
+  return runs;
+}
+
+/**
+ * A scannable Code 128 barcode, sized in real millimetres.
+ *
+ * One SVG unit is one module, and a module is a whole number of printer dots
+ * (see `fitBarcode`), so every bar edge lands on the head's own grid. The quiet
+ * zones are part of the symbol, not decoration: a scanner will not lock on to
+ * bars that run up against anything, including the edge of a sticker.
  */
 export function Barcode({
   value,
-  /** Bar width in px. Below 1.6 a 203dpi head starts merging bars. */
-  barWidth = 1.8,
-  height = 38,
-  showValue = true,
+  moduleMm,
+  offsetMm,
+  barHeight,
   className,
 }: {
   value: string;
-  barWidth?: number;
-  height?: number;
-  showValue?: boolean;
+  /** One module, a whole number of printer dots. */
+  moduleMm: number;
+  /**
+   * Where the left quiet zone starts, from this box's left edge, in whole
+   * dots. Omitted, the symbol is simply centred — fine on screen, but on paper
+   * centring can put every bar edge half a dot off the head's grid.
+   */
+  offsetMm?: number;
+  /** A CSS length for the bars. Omitted, they fill the height they are given. */
+  barHeight?: string;
   className?: string;
 }) {
-  const ref = useRef<SVGSVGElement>(null);
-  const encodable = isEncodable(value);
+  const pattern = code128Pattern(value);
 
-  useEffect(() => {
-    if (!ref.current || !encodable) return;
-
-    JsBarcode(ref.current, value, {
-      format: "CODE128",
-      width: barWidth,
-      height,
-      displayValue: showValue,
-      // The human-readable line is the fallback when a scan fails, so it has
-      // to be legible on thermal paper rather than merely present.
-      font: "Inter Variable, sans-serif",
-      fontSize: 11,
-      textMargin: 1,
-      margin: 0,
-      background: "#ffffff",
-      lineColor: "#000000",
-    });
-  }, [value, barWidth, height, showValue, encodable]);
-
-  if (!encodable) {
+  if (!pattern) {
     return (
-      <p className={className}>
-        <span className="font-mono">{value || "No barcode"}</span>
-      </p>
+      <p className={cn("font-mono", className)}>{value || "No barcode"}</p>
     );
   }
 
-  return <svg ref={ref} className={className} />;
+  return (
+    <div
+      className={cn(
+        "flex min-h-0 flex-col bg-white",
+        offsetMm === undefined ? "items-center" : "items-start",
+        className,
+      )}
+    >
+      <div
+        className="flex min-h-0 flex-1 bg-white"
+        style={{
+          paddingInline: `${QUIET_ZONE_MODULES * moduleMm}mm`,
+          marginLeft: offsetMm === undefined ? undefined : `${offsetMm}mm`,
+        }}
+      >
+        <svg
+          role="img"
+          aria-label={`Barcode ${value}`}
+          viewBox={`0 0 ${pattern.length} 1`}
+          preserveAspectRatio="none"
+          shapeRendering="crispEdges"
+          className="block"
+          style={{
+            width: `${pattern.length * moduleMm}mm`,
+            height: barHeight ?? "100%",
+          }}
+        >
+          {darkRuns(pattern).map((run) => (
+            <rect key={run.x} x={run.x} y={0} width={run.width} height={1} fill="#000" />
+          ))}
+        </svg>
+      </div>
+
+      {/* The fallback when a label is scuffed: typed in at the till by hand. */}
+      <p className="self-stretch text-center font-mono leading-none tracking-wider">
+        {value}
+      </p>
+    </div>
+  );
 }

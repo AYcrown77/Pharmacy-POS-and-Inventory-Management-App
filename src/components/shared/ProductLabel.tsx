@@ -1,85 +1,165 @@
 "use client";
 
-import { Barcode } from "./Barcode";
+import { createPortal } from "react-dom";
+
+import { Barcode, code128Pattern } from "./Barcode";
+import { cn } from "@/lib/cn";
+import {
+  LABEL_EDGE_MM,
+  ROLL_PRINTABLE_WIDTH_MM,
+  fitBarcode,
+  toWholeDotsMm,
+  type LabelSetup,
+} from "@/lib/labels";
 import { formatMoney } from "@/lib/money";
+import { UNIT_TYPE_LABELS } from "@/lib/status";
 import type { PharmacySettings, Product } from "@/types/domain";
 
 /**
- * A shelf-edge / product label for the till roll.
+ * How the product's barcode sits on this stock, or null when it has none.
+ * The dialog uses the same answer to warn before a label that cannot scan is
+ * printed.
+ */
+export function labelBarcodeFit(product: Product, setup: LabelSetup) {
+  const pattern = product.barcode ? code128Pattern(product.barcode) : null;
+  if (!pattern) return null;
+
+  const labelWidthMm =
+    setup.kind === "STICKER" ? setup.widthMm : ROLL_PRINTABLE_WIDTH_MM;
+  return fitBarcode(pattern.length, labelWidthMm, setup.dpi);
+}
+
+/**
+ * A shelf / pack label.
  *
- * Sized by the same `--receipt-width` calibration as the receipt, because it
- * comes off the same printer. What a person reads at the shelf is the name and
- * the price, so those lead; the barcode is for the scanner and the digits
- * under it are the fallback for when a label gets scuffed.
+ * On a sticker the label is exactly the sticker, so nothing essential can land
+ * in the gap between two of them. What a person reads is the name and the
+ * price, so those lead; the barcode takes whatever height is left.
  */
 export function ProductLabel({
   product,
   settings,
+  setup,
 }: {
   product: Product;
   settings?: PharmacySettings | undefined;
+  setup: LabelSetup;
 }) {
-  const strength = [product.strength, product.dosageForm?.toLowerCase()]
+  const sticker = setup.kind === "STICKER";
+  // A 25mm sticker has room for the name, the price and a barcode tall enough
+  // to aim at — not for the strength line and the pharmacy name as well.
+  const roomy = !sticker || setup.heightMm >= 30;
+  const fit = labelBarcodeFit(product, setup);
+  // The edge is a whole number of dots as well, so the barcode's whole-dot
+  // offset is measured from a point already on the head's grid.
+  const edgeMm = toWholeDotsMm(LABEL_EDGE_MM, setup.dpi);
+  const unit = (UNIT_TYPE_LABELS[product.unitType] ?? "unit").toLowerCase();
+  const detail = [product.strength, product.dosageForm?.toLowerCase()]
     .filter(Boolean)
     .join(" · ");
 
   return (
-    <div className="flex w-[var(--receipt-width)] break-inside-avoid flex-col items-center gap-0.5 border-b border-dashed border-black px-1 py-2 text-center font-sans text-black">
-      <p className="w-full text-[10px] font-bold leading-tight break-words">
+    <div
+      className={cn(
+        "flex flex-col items-center overflow-hidden bg-white text-center font-sans text-black",
+        sticker
+          ? "break-after-page last:break-after-auto"
+          : "break-inside-avoid border-b border-dashed border-black py-[2mm]",
+      )}
+      style={
+        sticker
+          ? {
+              width: `${setup.widthMm}mm`,
+              // A hair under the page, so rounding can never spill a label onto
+              // a second page and shift every label after it off its sticker.
+              height: `${setup.heightMm - 0.4}mm`,
+              padding: `${edgeMm}mm`,
+              gap: "0.4mm",
+            }
+          : {
+              width: "var(--receipt-width)",
+              paddingInline: `${edgeMm}mm`,
+              gap: "0.6mm",
+            }
+      }
+    >
+      <p className="w-full truncate text-[7.5pt] font-bold leading-tight">
         {product.name}
       </p>
 
-      {strength && <p className="text-[9px] leading-tight">{strength}</p>}
+      {roomy && detail && (
+        <p className="w-full truncate text-[6.5pt] leading-tight">{detail}</p>
+      )}
 
-      <p className="text-[15px] font-bold leading-none tabular-nums">
+      {/* Per base unit, and it says so — a box of 20 capsules is not ₦2,000. */}
+      <p className="whitespace-nowrap text-[11pt] font-bold leading-none tabular-nums">
         {formatMoney(product.priceConsumer)}
+        <span className="text-[6.5pt] font-normal"> / {unit}</span>
       </p>
 
       {product.barcode ? (
-        <Barcode value={product.barcode} height={30} barWidth={1.6} />
+        <Barcode
+          value={product.barcode}
+          moduleMm={fit?.moduleMm ?? 0.25}
+          offsetMm={fit?.offsetMm}
+          barHeight={sticker ? undefined : "10mm"}
+          className={cn("w-full text-[7pt]", sticker && "flex-1")}
+        />
       ) : (
-        // Nothing to encode. Saying so on the label is better than printing a
-        // blank space that looks like a printer fault.
-        <p className="text-[9px] italic">No barcode assigned</p>
+        // Nothing to encode. Saying so is better than a blank space that looks
+        // like a printer fault.
+        <p className="text-[6.5pt] italic">No barcode assigned</p>
       )}
 
-      {settings?.name && (
-        <p className="text-[8px] uppercase tracking-wide">{settings.name}</p>
+      {roomy && settings?.name && (
+        <p className="w-full truncate text-[5.5pt] uppercase tracking-wide">
+          {settings.name}
+        </p>
       )}
     </div>
   );
 }
 
 /**
- * A strip of labels for one product.
+ * The labels that actually print.
  *
- * The receipt printer takes a continuous roll rather than a die-cut sheet, so
- * copies print end to end with a dashed line to cut along.
+ * Mounted straight under `<body>`. Stickers print one per page, and pages only
+ * break in normal flow — so for a sticker job the print styles take every
+ * other child of body out of the document and let this strip flow from the top
+ * of the first page (see globals.css). On screen it sits far off to the left;
+ * the print rules move it onto the paper.
  */
 export function ProductLabelStrip({
   product,
   copies,
   settings,
+  setup,
 }: {
   product: Product;
   copies: number;
   settings?: PharmacySettings | undefined;
+  setup: LabelSetup;
 }) {
-  return (
+  if (typeof document === "undefined") return null;
+
+  const sticker = setup.kind === "STICKER";
+
+  return createPortal(
     <div
-      data-print-root="labels"
+      data-print-root={sticker ? "stickers" : "labels"}
       aria-hidden
-      // Off-screen on a monitor, and — critically — the positioning lives on
-      // the print root itself rather than a wrapper. The print rule overrides
-      // this element's `left` to 0 to pull it onto the page; if the offset sat
-      // on a parent instead, that parent would become the containing block and
-      // the label would still be rendered 200 viewport widths away, printing a
-      // blank sheet.
-      className="pointer-events-none fixed left-[-200vw] top-0 w-[var(--receipt-width)] bg-white"
+      className="pointer-events-none fixed left-[-200vw] top-0 bg-white"
+      style={{ width: sticker ? `${setup.widthMm}mm` : "var(--receipt-width)" }}
     >
       {Array.from({ length: Math.max(1, copies) }, (_, index) => (
-        <ProductLabel key={index} product={product} settings={settings} />
+        <ProductLabel
+          key={index}
+          product={product}
+          settings={settings}
+          setup={setup}
+        />
       ))}
-    </div>
+    </div>,
+    document.body,
   );
 }

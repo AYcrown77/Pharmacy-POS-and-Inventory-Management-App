@@ -304,6 +304,28 @@
     transform: translateX(var(--receipt-inset));
   }
 
+  /* Die-cut stickers: one label per page, the page being one sticker (its size
+     is injected at print time — see lib/print.ts). Pages only break in normal
+     flow, so for this job every other child of body is taken out of the
+     document rather than merely hidden, and the strip flows from the top of
+     the first page. */
+  html:has([data-print-root="stickers"]),
+  html:has([data-print-root="stickers"]) body {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  body:has(> [data-print-root="stickers"]) > :not([data-print-root="stickers"]) {
+    display: none !important;
+  }
+
+  [data-print-root="stickers"] {
+    position: static;
+    left: auto;
+    padding: 0;
+  }
+
   /* Chrome, actions and anything else that must not reach the paper. */
   [data-print-hidden] {
     display: none !important;
