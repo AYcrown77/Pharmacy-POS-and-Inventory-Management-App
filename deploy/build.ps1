@@ -16,14 +16,43 @@ $ErrorActionPreference = "Stop"
 $AppDir = (Resolve-Path $AppDir).Path
 $BackendDir = Resolve-BackendDir -Hint $BackendDir -AppDir $AppDir
 
-# The repos carry pnpm lockfiles; installing with npm instead would rebuild
-# node_modules in a different layout and leave a stray package-lock.json.
+# The repos carry pnpm lockfiles, so pnpm is preferred: installing with npm
+# instead rebuilds node_modules in a different layout and resolves versions
+# afresh. But a broken pnpm must not stop the pharmacy from being deployed.
 function Get-PackageManager {
     param([string]$Dir)
-    if ((Test-Path (Join-Path $Dir "pnpm-lock.yaml")) -and (Get-Command pnpm -ErrorAction SilentlyContinue)) {
-        return "pnpm"
-    }
+
+    if (-not (Test-Path (Join-Path $Dir "pnpm-lock.yaml"))) { return "npm" }
+    if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) { return "npm" }
+
+    # That a `pnpm` command exists proves only that a shim is on the PATH. A
+    # half-installed pnpm — its shim pointing back at itself — answers just the
+    # same and then fails every command it is given. So ask it its version and
+    # believe the answer. cmd runs it, because PowerShell 5.1 turns a native
+    # command's stderr into errors that would stop the script here.
+    $version = cmd /c "pnpm --version 2>&1"
+    if ($LASTEXITCODE -eq 0 -and "$version" -match "^[0-9]+[.][0-9]+") { return "pnpm" }
+
+    Write-Host "  pnpm is installed but not working: $version" -ForegroundColor Yellow
+    Write-Host "  falling back to npm" -ForegroundColor Yellow
     return "npm"
+}
+
+# npm resolves peer dependencies more strictly than pnpm, and this tree was
+# resolved by pnpm. One retry rather than a failed deployment.
+function Invoke-Install {
+    param([string]$Manager, [string]$What)
+
+    & $Manager install
+    if ($LASTEXITCODE -eq 0) { return }
+
+    if ($Manager -eq "npm") {
+        Write-Host "  npm install failed; retrying with --legacy-peer-deps" -ForegroundColor Yellow
+        & npm install --legacy-peer-deps
+        if ($LASTEXITCODE -eq 0) { return }
+    }
+
+    throw "$Manager install failed for the $What"
 }
 
 function Get-EnvValue {
@@ -43,8 +72,7 @@ if (-not $apiPort) { $apiPort = "5000" }
 $apiPm = Get-PackageManager -Dir $BackendDir
 Write-Host "  using $apiPm"
 Push-Location $BackendDir
-& $apiPm install
-if ($LASTEXITCODE -ne 0) { throw "$apiPm install failed for the API" }
+Invoke-Install -Manager $apiPm -What "API"
 & $apiPm run build
 if ($LASTEXITCODE -ne 0) { throw "API build failed" }
 & $apiPm run migrate
@@ -77,8 +105,7 @@ if (Test-Path $devOutput) {
     Remove-Item $devOutput -Recurse -Force
     Write-Host "  cleared stale dev output"
 }
-& $appPm install
-if ($LASTEXITCODE -ne 0) { throw "$appPm install failed for the platform" }
+Invoke-Install -Manager $appPm -What "platform"
 & $appPm run build
 if ($LASTEXITCODE -ne 0) { throw "Platform build failed" }
 
