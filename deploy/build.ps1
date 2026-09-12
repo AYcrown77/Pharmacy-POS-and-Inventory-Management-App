@@ -16,43 +16,77 @@ $ErrorActionPreference = "Stop"
 $AppDir = (Resolve-Path $AppDir).Path
 $BackendDir = Resolve-BackendDir -Hint $BackendDir -AppDir $AppDir
 
-# The repos carry pnpm lockfiles, so pnpm is preferred: installing with npm
-# instead rebuilds node_modules in a different layout and resolves versions
-# afresh. But a broken pnpm must not stop the pharmacy from being deployed.
+<#
+    Which package manager to install with.
+
+    These repos are pnpm projects, and that is not a preference: npm cannot
+    install over a folder pnpm created. Its resolver walks pnpm's .pnpm symlink
+    tree and dies with "Cannot read properties of null (reading 'matches')".
+
+    So: the installed pnpm if it actually works; otherwise the exact version
+    the project pins, fetched on demand by npx; and only if neither can run,
+    npm — which then needs node_modules deleted first.
+#>
 function Get-PackageManager {
     param([string]$Dir)
 
-    if (-not (Test-Path (Join-Path $Dir "pnpm-lock.yaml"))) { return "npm" }
-    if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) { return "npm" }
+    $npm = [pscustomobject]@{ Name = "npm"; Exe = "npm"; Prefix = @() }
+    if (-not (Test-Path (Join-Path $Dir "pnpm-lock.yaml"))) { return $npm }
 
     # That a `pnpm` command exists proves only that a shim is on the PATH. A
     # half-installed pnpm — its shim pointing back at itself — answers just the
-    # same and then fails every command it is given. So ask it its version and
-    # believe the answer. cmd runs it, because PowerShell 5.1 turns a native
-    # command's stderr into errors that would stop the script here.
-    $version = cmd /c "pnpm --version 2>&1"
-    if ($LASTEXITCODE -eq 0 -and "$version" -match "^[0-9]+[.][0-9]+") { return "pnpm" }
+    # same and then fails every command. cmd runs it, because PowerShell 5.1
+    # turns a native command's stderr into errors that would stop the script.
+    if (Get-Command pnpm -ErrorAction SilentlyContinue) {
+        $version = cmd /c "pnpm --version 2>&1"
+        if ($LASTEXITCODE -eq 0 -and "$version" -match "^[0-9]+[.][0-9]+") {
+            return [pscustomobject]@{ Name = "pnpm $version"; Exe = "pnpm"; Prefix = @() }
+        }
+        Write-Host "  pnpm is installed but not working: $version" -ForegroundColor Yellow
+    }
 
-    Write-Host "  pnpm is installed but not working: $version" -ForegroundColor Yellow
-    Write-Host "  falling back to npm" -ForegroundColor Yellow
-    return "npm"
+    $pinned = "pnpm"
+    try {
+        $package = Get-Content (Join-Path $Dir "package.json") -Raw | ConvertFrom-Json
+        if ($package.packageManager -match "^pnpm@") { $pinned = $package.packageManager }
+    } catch {
+        # No packageManager field; the latest pnpm will do.
+    }
+
+    $version = cmd /c "npx --yes $pinned --version 2>&1"
+    if ($LASTEXITCODE -eq 0 -and "$version" -match "^[0-9]+[.][0-9]+") {
+        Write-Host "  using $pinned through npx (needs the internet once)" -ForegroundColor Yellow
+        return [pscustomobject]@{ Name = $pinned; Exe = "npx"; Prefix = @("--yes", $pinned) }
+    }
+
+    Write-Host "  pnpm could not be run at all; falling back to npm" -ForegroundColor Yellow
+    Write-Host "  if npm then fails, delete node_modules and run this again" -ForegroundColor Yellow
+    return $npm
 }
 
-# npm resolves peer dependencies more strictly than pnpm, and this tree was
-# resolved by pnpm. One retry rather than a failed deployment.
-function Invoke-Install {
-    param([string]$Manager, [string]$What)
+function Invoke-Pm {
+    param($Pm, [string[]]$Arguments)
+    # Splatting needs a variable: & $exe @(...) would pass the whole array as
+    # one argument, so "run build" arrives as a single unknown command.
+    $all = @($Pm.Prefix) + $Arguments
+    & $Pm.Exe @all
+}
 
-    & $Manager install
+function Invoke-Install {
+    param($Pm, [string]$What)
+
+    Invoke-Pm -Pm $Pm -Arguments @("install")
     if ($LASTEXITCODE -eq 0) { return }
 
-    if ($Manager -eq "npm") {
+    # npm resolves peer dependencies more strictly than pnpm, and this tree was
+    # resolved by pnpm. One retry rather than a failed deployment.
+    if ($Pm.Exe -eq "npm") {
         Write-Host "  npm install failed; retrying with --legacy-peer-deps" -ForegroundColor Yellow
         & npm install --legacy-peer-deps
         if ($LASTEXITCODE -eq 0) { return }
     }
 
-    throw "$Manager install failed for the $What"
+    throw "Installing the $What's dependencies failed."
 }
 
 function Get-EnvValue {
@@ -70,14 +104,17 @@ $apiPort = Get-EnvValue -File $apiEnv -Key "PORT"
 if (-not $apiPort) { $apiPort = "5000" }
 
 $apiPm = Get-PackageManager -Dir $BackendDir
-Write-Host "  using $apiPm"
+Write-Host "  using $($apiPm.Name)"
 Push-Location $BackendDir
-Invoke-Install -Manager $apiPm -What "API"
-& $apiPm run build
-if ($LASTEXITCODE -ne 0) { throw "API build failed" }
-& $apiPm run migrate
-if ($LASTEXITCODE -ne 0) { throw "Database migration failed" }
-Pop-Location
+try {
+    Invoke-Install -Pm $apiPm -What "API"
+    Invoke-Pm -Pm $apiPm -Arguments @("run", "build")
+    if ($LASTEXITCODE -ne 0) { throw "API build failed" }
+    Invoke-Pm -Pm $apiPm -Arguments @("run", "migrate")
+    if ($LASTEXITCODE -ne 0) { throw "Database migration failed" }
+} finally {
+    Pop-Location
+}
 
 Write-Host "`n== Checking the platform points at the API's port ($apiPort)" -ForegroundColor Cyan
 $appEnv = Join-Path $AppDir ".env.local"
@@ -93,22 +130,23 @@ Write-Host "  $proxy" -ForegroundColor Green
 
 Write-Host "`n== Platform ($AppDir)" -ForegroundColor Cyan
 $appPm = Get-PackageManager -Dir $AppDir
-Write-Host "  using $appPm"
+Write-Host "  using $($appPm.Name)"
 Push-Location $AppDir
+try {
+    # A dev server writes its own route types under .next\dev and leaves them
+    # half-written if it is ever killed — which then fails the production type
+    # check, because tsconfig includes them. They are dev-only output.
+    $devOutput = Join-Path $AppDir ".next\dev"
+    if (Test-Path $devOutput) {
+        Remove-Item $devOutput -Recurse -Force
+        Write-Host "  cleared stale dev output"
+    }
 
-# A dev server writes its own route types under .next\dev and leaves them
-# half-written if it is ever killed — which then fails the production type
-# check, because tsconfig includes them. They are dev-only output, so clear
-# them before building.
-$devOutput = Join-Path $AppDir ".next\dev"
-if (Test-Path $devOutput) {
-    Remove-Item $devOutput -Recurse -Force
-    Write-Host "  cleared stale dev output"
+    Invoke-Install -Pm $appPm -What "platform"
+    Invoke-Pm -Pm $appPm -Arguments @("run", "build")
+    if ($LASTEXITCODE -ne 0) { throw "Platform build failed" }
+} finally {
+    Pop-Location
 }
-Invoke-Install -Manager $appPm -What "platform"
-& $appPm run build
-if ($LASTEXITCODE -ne 0) { throw "Platform build failed" }
-
-Pop-Location
 
 Write-Host "`nBuilt. Start or restart the services with deploy\install.ps1 or deploy\update.ps1.`n" -ForegroundColor Green
