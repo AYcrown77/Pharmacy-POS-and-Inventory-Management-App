@@ -21,10 +21,11 @@ const lanDevOrigins = [
 ];
 
 const nextConfig: NextConfig = {
-  // Produces a self-contained server bundle for the pharmacy's local server,
-  // run under PM2. See docs/deployment notes in the implementation plan.
-  output: "standalone",
-
+  // No `output: "standalone"`. It bundles a copy of node_modules, and pnpm
+  // links packages into a shared store rather than copying them — on Windows
+  // the copied tree's links dangle and the server dies at startup with EPERM.
+  // The pharmacy's PC builds the app itself, so `next start` against the real
+  // node_modules is both simpler and one less thing to go wrong.
   allowedDevOrigins: [
     ...lanDevOrigins,
     ...(process.env.ALLOWED_DEV_ORIGINS?.split(",")

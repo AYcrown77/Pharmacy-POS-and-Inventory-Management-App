@@ -1,0 +1,22 @@
+node:internal/modules/cjs/loader:686
+      throw e;
+      ^
+
+Error: EPERM: operation not permitted, stat 'C:\Users\USER\Desktop\projects\mustaan\mustaan-frontend\.next\standalone\node_modules\.pnpm\next@16.3.3_@babel+core@7.2_b4b756a8a28359ccc944179e4af0474f\node_modules\react'
+    at Object.realpathSync (node:fs:2800:17)
+    at toRealPath (node:internal/modules/helpers:62:13)
+    at tryFile (node:internal/modules/cjs/loader:559:10)
+    at finalizeEsmResolution (node:internal/modules/cjs/loader:1443:18)
+    at resolveExports (node:internal/modules/cjs/loader:679:14)
+    at Module._findPath (node:internal/modules/cjs/loader:746:31)
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1406:27)
+    at C:\Users\USER\Desktop\projects\mustaan\mustaan-frontend\.next\standalone\node_modules\.pnpm\next@16.3.3_@babel+core@7.2_b4b756a8a28359ccc944179e4af0474f\node_modules\next\dist\server\require-hook.js:68:36
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22) {
+  errno: -4048,
+  code: 'EPERM',
+  syscall: 'stat',
+  path: 'C:\\Users\\USER\\Desktop\\projects\\mustaan\\mustaan-frontend\\.next\\standalone\\node_modules\\.pnpm\\next@16.3.3_@babel+core@7.2_b4b756a8a28359ccc944179e4af0474f\\node_modules\\react'
+}
+
+Node.js v24.12.0
