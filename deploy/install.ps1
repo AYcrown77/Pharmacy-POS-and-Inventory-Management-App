@@ -11,6 +11,8 @@
 param(
     # Port 80 keeps the port out of the address the staff type: http://server/
     [int]$Port = 80,
+    # Only needed when the API folder cannot be found automatically.
+    [string]$BackendDir,
     [switch]$NoBackup
 )
 
@@ -45,12 +47,13 @@ function Install-AppTask {
 }
 
 Write-Host "`n== Services" -ForegroundColor Cyan
-Install-AppTask -Name $apiTask -Script (Join-Path $PSScriptRoot "start-backend.ps1")
+$apiArguments = if ($BackendDir) { "-BackendDir `"$BackendDir`"" } else { "" }
+Install-AppTask -Name $apiTask -Script (Join-Path $PSScriptRoot "start-backend.ps1") -Arguments $apiArguments
 Install-AppTask -Name $posTask -Script (Join-Path $PSScriptRoot "start-frontend.ps1") -Arguments "-Port $Port"
 
 if (-not $NoBackup) {
     $backupAction = New-ScheduledTaskAction -Execute "powershell.exe" `
-        -Argument ("-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"{0}`"" -f (Join-Path $PSScriptRoot "backup-db.ps1"))
+        -Argument ("-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"{0}`" {1}" -f (Join-Path $PSScriptRoot "backup-db.ps1"), $apiArguments).Trim()
     $backupTrigger = New-ScheduledTaskTrigger -Daily -At "10:00pm"
     $backupPrincipal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
     Register-ScheduledTask -TaskName $backupTask -Action $backupAction -Trigger $backupTrigger `

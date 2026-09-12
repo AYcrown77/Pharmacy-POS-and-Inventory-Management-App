@@ -5,13 +5,14 @@
     environment — it is never written to a file or printed.
 #>
 param(
-    [string]$BackendDir = (Join-Path (Split-Path $PSScriptRoot -Parent) "..\mutaan-backend"),
+    [string]$BackendDir,
     [string]$OutDir = (Join-Path $PSScriptRoot "backups"),
     [int]$KeepDays = 30
 )
 
 $ErrorActionPreference = "Stop"
-$BackendDir = (Resolve-Path $BackendDir).Path
+. (Join-Path $PSScriptRoot "common.ps1")
+$BackendDir = Resolve-BackendDir -Hint $BackendDir -AppDir (Split-Path $PSScriptRoot -Parent)
 $envFile = Join-Path $BackendDir ".env"
 if (-not (Test-Path $envFile)) { throw "$envFile is missing." }
 

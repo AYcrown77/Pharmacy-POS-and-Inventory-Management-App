@@ -5,11 +5,12 @@
     mutaan-backend\.env, so this sets only what the service itself decides.
 #>
 param(
-    [string]$BackendDir = (Join-Path (Split-Path $PSScriptRoot -Parent) "..\mutaan-backend")
+    [string]$BackendDir
 )
 
 $ErrorActionPreference = "Stop"
-$BackendDir = (Resolve-Path $BackendDir).Path
+. (Join-Path $PSScriptRoot "common.ps1")
+$BackendDir = Resolve-BackendDir -Hint $BackendDir -AppDir (Split-Path $PSScriptRoot -Parent)
 
 $logDir = Join-Path $PSScriptRoot "logs"
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null

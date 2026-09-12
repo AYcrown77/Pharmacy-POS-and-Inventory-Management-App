@@ -8,12 +8,13 @@
 #>
 param(
     [string]$AppDir = (Split-Path $PSScriptRoot -Parent),
-    [string]$BackendDir = (Join-Path (Split-Path $PSScriptRoot -Parent) "..\mutaan-backend")
+    [string]$BackendDir
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "common.ps1")
 $AppDir = (Resolve-Path $AppDir).Path
-$BackendDir = (Resolve-Path $BackendDir).Path
+$BackendDir = Resolve-BackendDir -Hint $BackendDir -AppDir $AppDir
 
 # The repos carry pnpm lockfiles; installing with npm instead would rebuild
 # node_modules in a different layout and leave a stray package-lock.json.
