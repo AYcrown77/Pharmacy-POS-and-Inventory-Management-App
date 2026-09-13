@@ -53,14 +53,17 @@ function Get-PackageManager {
         # No packageManager field; the latest pnpm will do.
     }
 
-    $version = cmd /c "npx --yes $pinned --version 2>&1"
-    if ($LASTEXITCODE -eq 0 -and "$version" -match "^[0-9]+[.][0-9]+") {
+    # npx prints its own "npm warn exec" lines before the answer, so look for a
+    # version on any line rather than at the start of the output.
+    $output = @(cmd /c "npx --yes $pinned --version 2>&1")
+    if ($LASTEXITCODE -eq 0 -and ($output | Where-Object { $_ -match "^[0-9]+[.][0-9]+" })) {
         Write-Host "  using $pinned through npx (needs the internet once)" -ForegroundColor Yellow
         return [pscustomobject]@{ Name = $pinned; Exe = "npx"; Prefix = @("--yes", $pinned) }
     }
 
-    Write-Host "  pnpm could not be run at all; falling back to npm" -ForegroundColor Yellow
-    Write-Host "  if npm then fails, delete node_modules and run this again" -ForegroundColor Yellow
+    Write-Host "  pnpm could not be run at all, including through npx:" -ForegroundColor Yellow
+    $output | Select-Object -Last 3 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkYellow }
+    Write-Host "  falling back to npm" -ForegroundColor Yellow
     return $npm
 }
 
@@ -73,7 +76,16 @@ function Invoke-Pm {
 }
 
 function Invoke-Install {
-    param($Pm, [string]$What)
+    param($Pm, [string]$Dir, [string]$What)
+
+    # npm's resolver walks pnpm's .pnpm symlink tree and dies on it
+    # ("Cannot read properties of null"). If npm is what we have, the tree pnpm
+    # built has to go; npm then installs its own from package.json.
+    $pnpmTree = Join-Path $Dir "node_modules\.pnpm"
+    if ($Pm.Exe -eq "npm" -and (Test-Path $pnpmTree)) {
+        Write-Host "  removing the pnpm-built node_modules so npm can install" -ForegroundColor Yellow
+        Remove-Item (Join-Path $Dir "node_modules") -Recurse -Force
+    }
 
     Invoke-Pm -Pm $Pm -Arguments @("install")
     if ($LASTEXITCODE -eq 0) { return }
@@ -107,7 +119,7 @@ $apiPm = Get-PackageManager -Dir $BackendDir
 Write-Host "  using $($apiPm.Name)"
 Push-Location $BackendDir
 try {
-    Invoke-Install -Pm $apiPm -What "API"
+    Invoke-Install -Pm $apiPm -Dir $BackendDir -What "API"
     Invoke-Pm -Pm $apiPm -Arguments @("run", "build")
     if ($LASTEXITCODE -ne 0) { throw "API build failed" }
     Invoke-Pm -Pm $apiPm -Arguments @("run", "migrate")
@@ -142,7 +154,7 @@ try {
         Write-Host "  cleared stale dev output"
     }
 
-    Invoke-Install -Pm $appPm -What "platform"
+    Invoke-Install -Pm $appPm -Dir $AppDir -What "platform"
     Invoke-Pm -Pm $appPm -Arguments @("run", "build")
     if ($LASTEXITCODE -ne 0) { throw "Platform build failed" }
 } finally {
