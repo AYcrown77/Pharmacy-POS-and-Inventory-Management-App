@@ -138,3 +138,10 @@ export const STOCK_AFFECTING_KEYS = [
   dashboardKeys.all,
   reportKeys.all,
 ] as const;
+
+export const expenseKeys = {
+  all: ["expenses"] as const,
+  lists: () => [...expenseKeys.all, "list"] as const,
+  list: (filters: unknown) => [...expenseKeys.lists(), filters] as const,
+  summary: (range: DateRange) => [...expenseKeys.all, "summary", range] as const,
+};

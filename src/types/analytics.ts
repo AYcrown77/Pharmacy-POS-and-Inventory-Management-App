@@ -8,9 +8,12 @@
 
 import type { DateOnly, Money, Timestamp } from "./common";
 import type {
+  Customer,
+  ExpenseCategory,
   ExpiryStatus,
   MovementType,
   PaymentMethod,
+  SalePaymentMethod,
   SaleStatus,
   StockStatus,
 } from "./domain";
@@ -100,7 +103,7 @@ export interface RecentSaleSummary {
   cashierName: string;
   itemCount: number;
   total: Money;
-  paymentMethod: PaymentMethod;
+  paymentMethod: SalePaymentMethod;
   status: SaleStatus;
   createdAt: Timestamp;
 }
@@ -117,6 +120,14 @@ export interface SalesReportSummary {
   /** Refunds recorded in the same period, shown against gross takings. */
   refundedAmount: Money;
   refundCount: number;
+  /** Goods handed over on account: inside gross sales, not yet paid for. */
+  creditSales: Money;
+  /** Money in against older debts — not a sale, but in the drawer. */
+  debtCollected: Money;
+  /** Recorded (not voided) expenses on the same days. */
+  expenses: ExpenseSummary;
+  /** Gross sales, less refunds, less expenses. */
+  netSales: Money;
 }
 
 export interface CashierReportRow {
@@ -126,6 +137,8 @@ export interface CashierReportRow {
   cashSales: Money;
   cardSales: Money;
   transferSales: Money;
+  /** Taken on account rather than paid. */
+  creditSales: Money;
   totalSales: Money;
   averageSale: Money;
 }
@@ -146,4 +159,71 @@ export interface RecentMovementSummary {
   quantity: number;
   userName: string;
   createdAt: Timestamp;
+}
+
+/* -------------------------------------------------------------------------
+   Expenses
+   ------------------------------------------------------------------------- */
+
+export interface ExpenseCategoryTotal {
+  category: ExpenseCategory;
+  total: Money;
+  count: number;
+}
+
+export interface ExpenseSummary {
+  total: Money;
+  count: number;
+  /** Largest first. */
+  byCategory: ExpenseCategoryTotal[];
+}
+
+/* -------------------------------------------------------------------------
+   Customer buying habits
+   ------------------------------------------------------------------------- */
+
+export interface CustomerProductHabit {
+  productId: string;
+  productName: string;
+  /** Base units kept, returns taken off. */
+  quantity: number;
+  total: Money;
+  /** How many separate purchases included it. */
+  purchases: number;
+}
+
+export interface CustomerMonthSpend {
+  /** YYYY-MM. */
+  month: string;
+  total: Money;
+  purchases: number;
+}
+
+export interface CustomerRecentSale {
+  id: string;
+  receiptNumber: string;
+  total: Money;
+  refunded: Money;
+  paymentMethod: SalePaymentMethod;
+  status: SaleStatus;
+  itemCount: number;
+  createdAt: Timestamp;
+}
+
+export interface CustomerInsights {
+  customer: Customer;
+  /** Across sales not fully reversed, refunds taken off. */
+  totalSpent: Money;
+  purchaseCount: number;
+  averageBasket: Money;
+  firstPurchaseAt: Timestamp | null;
+  lastPurchaseAt: Timestamp | null;
+  /** Typical gap between visits; null until there are two purchases. */
+  averageDaysBetweenPurchases: number | null;
+  preferredPaymentMethod: SalePaymentMethod | null;
+  takenOnAccount: Money;
+  topProducts: CustomerProductHabit[];
+  /** The last six months, oldest first, quiet months included. */
+  monthly: CustomerMonthSpend[];
+  recentSales: CustomerRecentSale[];
 }

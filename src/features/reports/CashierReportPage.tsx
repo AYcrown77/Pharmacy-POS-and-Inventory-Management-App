@@ -54,7 +54,7 @@ export function CashierReportPage() {
       {
         id: "cashierName",
         header: "Cashier",
-        width: "22%",
+        width: "20%",
         cell: (row) => (
           <PrimaryCell
             title={row.cashierName}
@@ -66,7 +66,7 @@ export function CashierReportPage() {
         id: "transactions",
         header: "Transactions",
         align: "right",
-        width: "13%",
+        width: "11%",
         cell: (row) => (
           <NumericCell>{formatQuantity(row.transactions)}</NumericCell>
         ),
@@ -75,7 +75,7 @@ export function CashierReportPage() {
         id: "cashSales",
         header: "Cash",
         align: "right",
-        width: "14%",
+        width: "13%",
         cell: (row) => (
           <NumericCell className="font-medium">
             {formatMoney(row.cashSales)}
@@ -86,7 +86,7 @@ export function CashierReportPage() {
         id: "cardSales",
         header: "POS / Card",
         align: "right",
-        width: "14%",
+        width: "13%",
         cell: (row) => (
           <NumericCell muted>{formatMoney(row.cardSales)}</NumericCell>
         ),
@@ -95,16 +95,27 @@ export function CashierReportPage() {
         id: "transferSales",
         header: "Transfer",
         align: "right",
-        width: "14%",
+        width: "12%",
         cell: (row) => (
           <NumericCell muted>{formatMoney(row.transferSales)}</NumericCell>
+        ),
+      },
+      {
+        // Goods handed over on account: in the total, but in no drawer.
+        id: "creditSales",
+        header: "On account",
+        align: "right",
+        width: "12%",
+        hideBelow: "lg",
+        cell: (row) => (
+          <NumericCell muted>{formatMoney(row.creditSales)}</NumericCell>
         ),
       },
       {
         id: "totalSales",
         header: "Total",
         align: "right",
-        width: "15%",
+        width: "14%",
         cell: (row) => (
           <NumericCell className="font-semibold">
             {formatMoney(row.totalSales)}
@@ -145,6 +156,7 @@ export function CashierReportPage() {
             { header: "Cash", value: (c) => csvMoney(c.cashSales) },
             { header: "POS / Card", value: (c) => csvMoney(c.cardSales) },
             { header: "Transfer", value: (c) => csvMoney(c.transferSales) },
+            { header: "On account", value: (c) => csvMoney(c.creditSales) },
             { header: "Total", value: (c) => csvMoney(c.totalSales) },
             { header: "Average sale", value: (c) => csvMoney(c.averageSale) },
           ],

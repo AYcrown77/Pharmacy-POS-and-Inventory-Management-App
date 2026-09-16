@@ -246,18 +246,35 @@ export function SaleDetailPage({ saleId }: { saleId: string }) {
                 <PaymentMethodBadge method={data.paymentMethod} size="sm" />
               </div>
 
+              {(data.payments?.length ?? 0) > 1 &&
+                data.payments!.map((part) => (
+                  <Row
+                    key={part.id}
+                    label={PAYMENT_METHOD_LABELS[part.method]}
+                    value={formatMoney(part.amountTendered)}
+                  />
+                ))}
+
               {data.amountReceived !== null && (
-                <>
-                  <Row
-                    label="Received"
-                    value={formatMoney(data.amountReceived)}
-                  />
-                  <Row
-                    label="Change given"
-                    value={formatMoney(data.changeGiven ?? 0)}
-                  />
-                </>
+                <Row label="Received" value={formatMoney(data.amountReceived)} />
               )}
+              {data.changeGiven !== null && (
+                <Row label="Change given" value={formatMoney(data.changeGiven)} />
+              )}
+
+              {data.debtCharged > 0 && (
+                <Row label="Added to account" value={formatMoney(data.debtCharged)} />
+              )}
+              {data.debtRepaid > 0 && (
+                <Row label="Paid off account" value={formatMoney(data.debtRepaid)} />
+              )}
+              {data.customerBalanceAfter !== null &&
+                (data.debtCharged > 0 || data.debtRepaid > 0) && (
+                  <Row
+                    label={`${data.customerName ?? "Account"} balance after`}
+                    value={formatMoney(data.customerBalanceAfter)}
+                  />
+                )}
 
               {refunded > 0 && (
                 <Row label="Refunded" value={`− ${formatMoney(refunded)}`} />

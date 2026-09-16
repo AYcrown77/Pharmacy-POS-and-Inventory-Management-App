@@ -12,6 +12,7 @@ import { ApiError, http } from "@/lib/api/http";
 import { mockRequest, matchesSearch, paginate } from "@/mocks/latency";
 import { db } from "@/mocks/db";
 import type { ListParams, Money, Paginated } from "@/types/common";
+import type { CustomerInsights } from "@/types/analytics";
 import type { Customer, CustomerLedgerEntry } from "@/types/domain";
 
 export interface CustomerFilters extends ListParams {
@@ -42,6 +43,8 @@ export interface CustomersService {
   list(filters?: CustomerFilters): Promise<Paginated<Customer>>;
   getById(id: string): Promise<Customer>;
   getLedger(id: string, params?: ListParams): Promise<CustomerLedger>;
+  /** How the customer buys: spend, frequency, what they come back for. */
+  getInsights(id: string): Promise<CustomerInsights>;
   create(input: CustomerInput): Promise<Customer>;
   update(id: string, input: CustomerInput): Promise<Customer>;
   recordRepayment(
@@ -82,6 +85,27 @@ const mockCustomersService: CustomersService = {
         (entry) => entry.customerId === id,
       );
       return { customer, entries: paginate(entries, params) };
+    }),
+
+  getInsights: (id) =>
+    mockRequest(() => {
+      const customer = db.customers.find((item) => item.id === id);
+      if (!customer) throw new ApiError(404, "Customer not found.");
+      // Mock sales are all walk-ins, so no account has a buying history.
+      return {
+        customer,
+        totalSpent: 0,
+        purchaseCount: 0,
+        averageBasket: 0,
+        firstPurchaseAt: null,
+        lastPurchaseAt: null,
+        averageDaysBetweenPurchases: null,
+        preferredPaymentMethod: null,
+        takenOnAccount: 0,
+        topProducts: [],
+        monthly: [],
+        recentSales: [],
+      } satisfies CustomerInsights;
     }),
 
   create: (input) =>
@@ -154,6 +178,7 @@ const httpCustomersService: CustomersService = {
   getById: (id) => http.get<Customer>(`/customers/${id}`),
   getLedger: (id, params) =>
     http.get<CustomerLedger>(`/customers/${id}/ledger`, { params }),
+  getInsights: (id) => http.get<CustomerInsights>(`/customers/${id}/insights`),
   create: (input) => http.post<Customer>("/customers", input),
   update: (id, input) => http.patch<Customer>(`/customers/${id}`, input),
   recordRepayment: (id, input) =>

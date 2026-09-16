@@ -6,7 +6,7 @@ import { CheckCircle2, Eye, Printer, ScanBarcode } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { formatMoney } from "@/lib/money";
-import { PAYMENT_METHOD_LABELS } from "@/lib/status";
+import { SALE_PAYMENT_METHOD_LABELS } from "@/lib/status";
 import type { Sale } from "@/types/domain";
 
 /**
@@ -72,7 +72,7 @@ export function SaleSuccessDialog({
               {sale.receiptNumber}
             </p>
             <p className="text-meta text-neutral-500">
-              {PAYMENT_METHOD_LABELS[sale.paymentMethod]} ·{" "}
+              {SALE_PAYMENT_METHOD_LABELS[sale.paymentMethod]} ·{" "}
               {sale.items.length}{" "}
               {sale.items.length === 1 ? "line" : "lines"}
             </p>

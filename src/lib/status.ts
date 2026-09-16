@@ -17,8 +17,11 @@ import type {
   DosageForm,
   ExpiryStatus,
   MovementType,
+  ExpenseCategory,
+  ExpenseStatus,
   PaymentMethod,
   Role,
+  SalePaymentMethod,
   SaleStatus,
   StockStatus,
   TerminalType,
@@ -179,6 +182,51 @@ export const PAYMENT_METHODS: readonly PaymentMethod[] = [
   "TRANSFER",
 ];
 
+/** What a sale can be filed under, which includes a split payment. */
+export const SALE_PAYMENT_METHOD_LABELS: Record<SalePaymentMethod, string> = {
+  ...PAYMENT_METHOD_LABELS,
+  SPLIT: "Split payment",
+};
+
+export const SALE_PAYMENT_METHOD_SHORT_LABELS: Record<SalePaymentMethod, string> = {
+  ...PAYMENT_METHOD_SHORT_LABELS,
+  SPLIT: "Split",
+};
+
+export const SALE_PAYMENT_METHODS: readonly SalePaymentMethod[] = [
+  ...PAYMENT_METHODS,
+  "SPLIT",
+];
+
+/* -------------------------------------------------------------------------
+   Expenses
+   ------------------------------------------------------------------------- */
+
+export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
+  GENERATOR_FUEL: "Generator fuel",
+  UTILITIES: "Electricity & water",
+  TRANSPORT: "Transport & delivery",
+  SUPPLIES: "Shop supplies",
+  REPAIRS: "Repairs & maintenance",
+  STAFF: "Staff costs",
+  RENT: "Rent & levies",
+  OTHER: "Other",
+};
+
+export const EXPENSE_CATEGORIES = Object.keys(
+  EXPENSE_CATEGORY_LABELS,
+) as ExpenseCategory[];
+
+export const EXPENSE_STATUS_LABELS: Record<ExpenseStatus, string> = {
+  RECORDED: "Recorded",
+  VOIDED: "Voided",
+};
+
+export const EXPENSE_STATUS_TONES: Record<ExpenseStatus, Tone> = {
+  RECORDED: "neutral",
+  VOIDED: "danger",
+};
+
 export const ROLE_LABELS: Record<Role, string> = {
   ADMINISTRATOR: "Administrator",
   CASHIER: "Cashier",
@@ -247,6 +295,12 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   USER_DISABLED: "User Disabled",
   USER_ENABLED: "User Enabled",
   SETTINGS_UPDATED: "Settings Updated",
+  CUSTOMER_CREATED: "Customer Created",
+  CUSTOMER_UPDATED: "Customer Updated",
+  CUSTOMER_REPAYMENT: "Customer Repayment",
+  CUSTOMER_CHARGED: "Taken on Account",
+  EXPENSE_RECORDED: "Expense Recorded",
+  EXPENSE_VOIDED: "Expense Voided",
 };
 
 /** Every action, newest-relevant first, for the audit log's filter. */
@@ -269,6 +323,12 @@ export const AUDIT_ACTION_TONES: Record<AuditAction, Tone> = {
   USER_DISABLED: "danger",
   USER_ENABLED: "success",
   SETTINGS_UPDATED: "info",
+  CUSTOMER_CREATED: "success",
+  CUSTOMER_UPDATED: "info",
+  CUSTOMER_REPAYMENT: "success",
+  CUSTOMER_CHARGED: "warning",
+  EXPENSE_RECORDED: "warning",
+  EXPENSE_VOIDED: "danger",
 };
 
 /* -------------------------------------------------------------------------

@@ -13,13 +13,13 @@ import { completeSale, db, type CompleteSaleInput } from "@/mocks/db";
 import { matchesSearch, mockRequest, paginate, sortBy } from "@/mocks/latency";
 import type { DateOnly, ListParams, Paginated } from "@/types/common";
 import type { RecentSaleSummary } from "@/types/analytics";
-import type { PaymentMethod, Sale, SaleStatus } from "@/types/domain";
+import type { Sale, SalePaymentMethod, SaleStatus } from "@/types/domain";
 
 export interface SaleFilters extends ListParams {
   from?: DateOnly;
   to?: DateOnly;
   cashierId?: string;
-  paymentMethod?: PaymentMethod;
+  paymentMethod?: SalePaymentMethod;
   status?: SaleStatus;
   terminalId?: string;
   /** Sales containing this product — powers the product's sales history. */

@@ -107,6 +107,36 @@ export function OrderPanel({
             {formatMoney(total)}
           </span>
         </div>
+
+        {/* An account's balance is collected with the sale — or its credit
+            used — so the till shows what to actually ask for. The payment step
+            can still leave it off. */}
+        {customer && customer.balance !== 0 && itemCount > 0 && (
+          <div className="mt-2 flex flex-col gap-0.5 border-t border-neutral-200 pt-2">
+            <div className="flex items-baseline justify-between gap-3 text-meta">
+              <span className="text-neutral-500">
+                {customer.balance > 0 ? "Previous balance" : "Credit on account"}
+              </span>
+              <span
+                className={cn(
+                  "num tabular-nums",
+                  customer.balance > 0 ? "text-danger-700" : "text-success-700",
+                )}
+              >
+                {customer.balance > 0 ? "+ " : "− "}
+                {formatMoney(Math.abs(customer.balance))}
+              </span>
+            </div>
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-meta font-medium text-neutral-700">
+                Due with balance
+              </span>
+              <span className="num text-base font-semibold tabular-nums text-neutral-900">
+                {formatMoney(Math.max(total + customer.balance, 0))}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Who the sale is for. Shown before payment, because whether someone

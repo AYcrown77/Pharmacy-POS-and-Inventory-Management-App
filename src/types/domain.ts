@@ -18,6 +18,13 @@ export type Role = "ADMINISTRATOR" | "CASHIER";
 export type PaymentMethod = "CASH" | "CARD" | "TRANSFER";
 
 /**
+ * What a sale is filed under: one of the methods above, or SPLIT when the
+ * customer paid by more than one — part cash, part card. The parts are the
+ * sale's `payments`.
+ */
+export type SalePaymentMethod = PaymentMethod | "SPLIT";
+
+/**
  * The three prices a product carries.
  *
  * A pharmacy sells the same medicine to a walk-in customer, a corner shop and
@@ -88,7 +95,13 @@ export type AuditAction =
   | "USER_UPDATED"
   | "USER_DISABLED"
   | "USER_ENABLED"
-  | "SETTINGS_UPDATED";
+  | "SETTINGS_UPDATED"
+  | "CUSTOMER_CREATED"
+  | "CUSTOMER_UPDATED"
+  | "CUSTOMER_REPAYMENT"
+  | "CUSTOMER_CHARGED"
+  | "EXPENSE_RECORDED"
+  | "EXPENSE_VOIDED";
 
 export type TerminalType = "CHECKOUT" | "DISPENSING" | "ADMIN";
 
@@ -208,6 +221,17 @@ export interface Terminal {
   isActive: boolean;
 }
 
+/** Money handed over by one method, and how much of it paid for the sale. */
+export interface SalePayment {
+  id: string;
+  saleId: string;
+  method: PaymentMethod;
+  /** What the customer handed over by this method. */
+  amountTendered: Money;
+  /** The part that paid for the goods; the rest cleared old debt or was change. */
+  amountApplied: Money;
+}
+
 export interface Sale {
   id: string;
   receiptNumber: string;
@@ -221,10 +245,10 @@ export interface Sale {
   subtotal: Money;
   discount: Money;
   total: Money;
-  paymentMethod: PaymentMethod;
+  paymentMethod: SalePaymentMethod;
   /** Which price list this sale was rung up at. */
   priceTier: PriceTier;
-  /** Cash sales only. */
+  /** Everything handed over, across every method used. */
   amountReceived: Money | null;
   changeGiven: Money | null;
   status: SaleStatus;
@@ -238,6 +262,8 @@ export interface Sale {
    */
   customerBalanceAfter: Money | null;
   items: SaleItem[];
+  /** One per method used. Mock data may not carry them. */
+  payments?: SalePayment[];
   createdAt: Timestamp;
 }
 
@@ -332,6 +358,13 @@ export interface Customer {
   /** Kobo owed to the pharmacy. Negative means they are in credit. */
   balance: Money;
   isActive: boolean;
+  /**
+   * Account lists only, read from the sales: spending across sales not fully
+   * reversed, net of refunds, and how often and how recently they bought.
+   */
+  totalSpent?: Money;
+  purchaseCount?: number;
+  lastPurchaseAt?: Timestamp | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -381,4 +414,39 @@ export interface PharmacySettings {
   currency: "NGN";
   lowStockAlertsEnabled: boolean;
   expiryAlertDays: number;
+}
+
+/* -------------------------------------------------------------------------
+   Expenses
+   ------------------------------------------------------------------------- */
+
+export type ExpenseCategory =
+  | "GENERATOR_FUEL"
+  | "UTILITIES"
+  | "TRANSPORT"
+  | "SUPPLIES"
+  | "REPAIRS"
+  | "STAFF"
+  | "RENT"
+  | "OTHER";
+
+/** An expense is never deleted; one recorded in error is voided. */
+export type ExpenseStatus = "RECORDED" | "VOIDED";
+
+export interface Expense {
+  id: string;
+  /** The day the money went out — the day the report deducts it from. */
+  expenseDate: DateOnly;
+  category: ExpenseCategory;
+  amount: Money;
+  paymentMethod: PaymentMethod;
+  reason: string;
+  recordedById: string;
+  recordedByName: string;
+  status: ExpenseStatus;
+  voidReason: string | null;
+  voidedById: string | null;
+  voidedByName: string | null;
+  voidedAt: Timestamp | null;
+  createdAt: Timestamp;
 }

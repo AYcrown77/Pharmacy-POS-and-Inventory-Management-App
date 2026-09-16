@@ -17,7 +17,6 @@ import { STOCK_AFFECTING_KEYS, salesKeys } from "@/lib/query/keys";
 import { unitLabel } from "@/lib/status";
 import { productsService, type SaleLookup } from "@/services/products.service";
 import { salesService } from "@/services/sales.service";
-import type { Money } from "@/types/common";
 import {
   defaultUnitForTier,
   type Customer,
@@ -31,6 +30,7 @@ import { CustomerPicker } from "./components/CustomerPicker";
 import { OrderPanel } from "./components/OrderPanel";
 import { SaleSuccessDialog } from "./components/SaleSuccessDialog";
 import { ScanBar } from "./components/ScanBar";
+import type { PaymentTender } from "./settlement";
 import { usePosCart } from "./usePosCart";
 
 /** Everything that can go wrong between scanning and adding to the cart. */
@@ -173,7 +173,7 @@ export function PosTerminal() {
      --------------------------------------------------------------------- */
 
   const complete = useMutation({
-    mutationFn: (amountReceived: Money | null) =>
+    mutationFn: (payments: PaymentTender[]) =>
       salesService.complete({
         lines: cart.state.lines.map((line) => ({
           productId: line.productId,
@@ -184,7 +184,7 @@ export function PosTerminal() {
         paymentMethod,
         priceTier: cart.state.priceTier,
         customerId: customer?.id ?? null,
-        amountReceived,
+        payments,
         cashierId: user?.id ?? "",
         terminalId: terminal.id,
       }),
@@ -193,6 +193,8 @@ export function PosTerminal() {
         void queryClient.invalidateQueries({ queryKey: key });
       }
       void queryClient.invalidateQueries({ queryKey: salesKeys.all });
+      // A sale on an account moves its balance and its buying history.
+      void queryClient.invalidateQueries({ queryKey: ["customers"] });
 
       setPayingOpen(false);
       setSaleError(null);
@@ -384,7 +386,7 @@ export function PosTerminal() {
         customer={customer}
         processing={busy}
         error={saleError}
-        onConfirm={(amountReceived) => complete.mutate(amountReceived)}
+        onConfirm={(payments) => complete.mutate(payments)}
       />
 
       <SaleSuccessDialog

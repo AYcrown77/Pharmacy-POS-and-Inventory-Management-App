@@ -21,11 +21,16 @@ import type {
   SalesReportSummary,
   SalesTrendPoint,
 } from "@/types/analytics";
-import type { MovementType, PaymentMethod, Sale } from "@/types/domain";
+import type {
+  MovementType,
+  PaymentMethod,
+  Sale,
+  SalePaymentMethod,
+} from "@/types/domain";
 
 export interface SalesReportFilters extends DateRange {
   cashierId?: string;
-  paymentMethod?: PaymentMethod;
+  paymentMethod?: SalePaymentMethod;
 }
 
 export interface MovementReportFilters extends Partial<DateRange> {
@@ -105,6 +110,12 @@ const mockReportsService: ReportsService = {
           0,
         ),
         refundCount: refunds.length,
+        creditSales: sales.reduce((total, sale) => total + sale.debtCharged, 0),
+        debtCollected: 0,
+        expenses: { total: 0, count: 0, byCategory: [] },
+        netSales:
+          grossSales -
+          refunds.reduce((total, entry) => total + entry.refundAmount, 0),
       } satisfies SalesReportSummary;
     }),
 
@@ -155,6 +166,7 @@ const mockReportsService: ReportsService = {
           cashSales: forMethod("CASH"),
           cardSales: forMethod("CARD"),
           transferSales: forMethod("TRANSFER"),
+          creditSales: own.reduce((total, sale) => total + sale.debtCharged, 0),
           totalSales,
           averageSale:
             own.length > 0 ? Math.round(totalSales / own.length) : 0,

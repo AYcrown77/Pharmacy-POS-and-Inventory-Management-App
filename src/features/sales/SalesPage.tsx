@@ -25,19 +25,19 @@ import { useAuth, useCan } from "@/lib/auth/AuthProvider";
 import { formatDate, formatTime, resolveDateRange, timestampToDateOnly, type DateRangePreset } from "@/lib/date";
 import { formatMoney, formatQuantity } from "@/lib/money";
 import {
-  PAYMENT_METHOD_LABELS,
-  PAYMENT_METHODS,
+  SALE_PAYMENT_METHOD_LABELS,
+  SALE_PAYMENT_METHODS,
   SALE_STATUS_LABELS,
 } from "@/lib/status";
 import type { DateRange } from "@/types/common";
-import type { PaymentMethod, Sale, SaleStatus } from "@/types/domain";
+import type { Sale, SalePaymentMethod, SaleStatus } from "@/types/domain";
 import { useCashiers, useSales } from "./hooks";
 
 interface SalesTableFilters {
   from?: string;
   to?: string;
   cashierId?: string;
-  paymentMethod?: PaymentMethod;
+  paymentMethod?: SalePaymentMethod;
   status?: SaleStatus;
 }
 
@@ -246,9 +246,9 @@ export function SalesPage() {
           allLabel="Any payment"
           value={table.filters.paymentMethod}
           onChange={(value) => table.setFilter("paymentMethod", value)}
-          options={PAYMENT_METHODS.map((method) => ({
+          options={SALE_PAYMENT_METHODS.map((method) => ({
             value: method,
-            label: PAYMENT_METHOD_LABELS[method],
+            label: SALE_PAYMENT_METHOD_LABELS[method],
           }))}
         />
 

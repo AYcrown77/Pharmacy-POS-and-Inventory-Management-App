@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { Receipt } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -11,7 +12,7 @@ import {
   PaymentMethodBadge,
   SaleStatusBadge,
 } from "@/components/shared/StatusBadges";
-import { Card, CardHeader } from "@/components/ui/Card";
+import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import {
   DataTable,
   NumericCell,
@@ -20,6 +21,7 @@ import {
 import { Skeleton } from "@/components/ui/Skeleton";
 import { EmptyState, ErrorState } from "@/components/ui/States";
 import { useAuth } from "@/lib/auth/AuthProvider";
+import { cn } from "@/lib/cn";
 import {
   formatDate,
   formatTime,
@@ -29,11 +31,17 @@ import {
 } from "@/lib/date";
 import { formatMoney, formatMoneyCompact, formatQuantity } from "@/lib/money";
 import { reportKeys } from "@/lib/query/keys";
-import { PAYMENT_METHOD_LABELS, PAYMENT_METHODS } from "@/lib/status";
+import {
+  EXPENSE_CATEGORY_LABELS,
+  PAYMENT_METHOD_LABELS,
+  SALE_PAYMENT_METHOD_LABELS,
+  SALE_PAYMENT_METHODS,
+} from "@/lib/status";
 import { reportsService } from "@/services/reports.service";
 import { useCashiers, useSales } from "@/features/sales/hooks";
 import type { DateRange } from "@/types/common";
-import type { PaymentMethod, Sale } from "@/types/domain";
+import type { SalesReportSummary } from "@/types/analytics";
+import type { Sale, SalePaymentMethod } from "@/types/domain";
 import { csvDateTime, csvMoney, csvNumber, exportCsv } from "@/lib/csv";
 import { ReportShell, ReportSummary } from "./components/ReportShell";
 
@@ -53,7 +61,7 @@ export function SalesReportPage() {
   );
   const [cashierId, setCashierId] = useState<string | undefined>();
   const [paymentMethod, setPaymentMethod] = useState<
-    PaymentMethod | undefined
+    SalePaymentMethod | undefined
   >();
 
   const filters = { ...range, cashierId, paymentMethod };
@@ -204,9 +212,9 @@ export function SalesReportPage() {
             allLabel="Any payment"
             value={paymentMethod}
             onChange={setPaymentMethod}
-            options={PAYMENT_METHODS.map((method) => ({
+            options={SALE_PAYMENT_METHODS.map((method) => ({
               value: method,
-              label: PAYMENT_METHOD_LABELS[method],
+              label: SALE_PAYMENT_METHOD_LABELS[method],
             }))}
           />
         </div>
@@ -241,6 +249,8 @@ export function SalesReportPage() {
         )
       }
     >
+      {summary.data && <Reconciliation summary={summary.data} />}
+
       {summary.data && summary.data.refundedAmount > 0 && (
         <p className="text-meta text-neutral-500">
           {formatQuantity(summary.data.refundCount)}{" "}
@@ -298,5 +308,121 @@ export function SalesReportPage() {
         </p>
       )}
     </ReportShell>
+  );
+}
+
+/**
+ * The day-end sum: what was sold, less what went back out.
+ *
+ * Refunds and expenses are money out of the business in the period, so they
+ * come off. Credit sales and debt collected are shown beside the sum rather
+ * than in it: neither changes what was earned, only when the money arrives.
+ */
+function Reconciliation({ summary }: { summary: SalesReportSummary }) {
+  return (
+    <Card>
+      <CardHeader
+        title="Takings after expenses"
+        description="Gross sales, less refunds and the expenses recorded for the same days."
+      />
+      <CardBody className="grid gap-6 lg:grid-cols-2">
+        <div className="flex flex-col gap-2">
+          <dl className="flex flex-col gap-2">
+            <Sum label="Gross sales" value={summary.grossSales} strong />
+            <Sum label="Refunds" value={-summary.refundedAmount} />
+            <Sum
+              label={`Expenses (${formatQuantity(summary.expenses.count)})`}
+              value={-summary.expenses.total}
+            />
+            <div className="flex items-baseline justify-between gap-3 border-t border-neutral-200 pt-2">
+              <dt className="text-base font-semibold text-neutral-900">
+                Net takings
+              </dt>
+              <dd
+                className={cn(
+                  "num text-title font-bold tabular-nums",
+                  summary.netSales < 0 ? "text-danger-700" : "text-neutral-900",
+                )}
+              >
+                {formatMoney(summary.netSales)}
+              </dd>
+            </div>
+          </dl>
+          <p className="text-meta text-neutral-500">
+            Of gross sales,{" "}
+            <span className="num font-medium text-neutral-700">
+              {formatMoney(summary.creditSales)}
+            </span>{" "}
+            was taken on account and is not yet paid.{" "}
+            <span className="num font-medium text-neutral-700">
+              {formatMoney(summary.debtCollected)}
+            </span>{" "}
+            came in against older debts — money in the drawer, but not a sale.
+          </p>
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-micro font-semibold uppercase tracking-wide text-neutral-500">
+              Expenses by category
+            </p>
+            <Link
+              href="/expenses"
+              className="text-meta font-medium text-primary-700 hover:underline"
+            >
+              View expenses
+            </Link>
+          </div>
+          {summary.expenses.byCategory.length === 0 ? (
+            <p className="mt-2 text-meta text-neutral-500">
+              No expenses recorded in this period.
+            </p>
+          ) : (
+            <ul className="mt-1 flex flex-col divide-y divide-neutral-100">
+              {summary.expenses.byCategory.map((entry) => (
+                <li
+                  key={entry.category}
+                  className="flex items-baseline justify-between gap-3 py-1.5"
+                >
+                  <span className="text-base text-neutral-700">
+                    {EXPENSE_CATEGORY_LABELS[entry.category]}{" "}
+                    <span className="text-meta text-neutral-400">
+                      · {formatQuantity(entry.count)}
+                    </span>
+                  </span>
+                  <span className="num text-base tabular-nums text-neutral-900">
+                    {formatMoney(entry.total)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </CardBody>
+    </Card>
+  );
+}
+
+function Sum({
+  label,
+  value,
+  strong = false,
+}: {
+  label: string;
+  value: number;
+  strong?: boolean;
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <dt className="text-base text-neutral-600">{label}</dt>
+      <dd
+        className={cn(
+          "num text-base tabular-nums",
+          strong ? "font-semibold text-neutral-900" : "text-neutral-700",
+        )}
+      >
+        {value < 0 ? `− ${formatMoney(-value)}` : formatMoney(value)}
+      </dd>
+    </div>
   );
 }

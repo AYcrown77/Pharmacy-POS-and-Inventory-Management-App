@@ -3,7 +3,7 @@
 import { formatDate, formatTime, timestampToDateOnly } from "@/lib/date";
 import { cn } from "@/lib/cn";
 import { formatMoney, formatQuantity } from "@/lib/money";
-import { PAYMENT_METHOD_LABELS } from "@/lib/status";
+import { PAYMENT_METHOD_LABELS, SALE_PAYMENT_METHOD_LABELS } from "@/lib/status";
 import type { PharmacySettings, Sale } from "@/types/domain";
 
 /**
@@ -110,8 +110,19 @@ export function ReceiptDocument({
       <div className="flex flex-col gap-0.5 tabular-nums">
         <Line
           label="Payment"
-          value={PAYMENT_METHOD_LABELS[sale.paymentMethod]}
+          value={SALE_PAYMENT_METHOD_LABELS[sale.paymentMethod]}
         />
+        {/* Each part of a split payment, so the customer can match the card
+            amount against their bank alert. */}
+        {(sale.payments?.length ?? 0) > 1 &&
+          sale.payments!.map((part) => (
+            <Line
+              key={part.id}
+              label={PAYMENT_METHOD_LABELS[part.method]}
+              value={formatMoney(part.amountTendered)}
+              indent
+            />
+          ))}
         {sale.amountReceived !== null && (
           <Line label="Received" value={formatMoney(sale.amountReceived)} />
         )}
@@ -134,6 +145,15 @@ export function ReceiptDocument({
           <Divider />
           <div className="flex flex-col gap-0.5 tabular-nums">
             <Line label="Account" value={sale.customerName ?? ""} />
+            {sale.customerBalanceAfter !== null &&
+              (sale.debtCharged > 0 || sale.debtRepaid > 0) && (
+                <Line
+                  label="Previous balance"
+                  value={formatMoney(
+                    sale.customerBalanceAfter - sale.debtCharged + sale.debtRepaid,
+                  )}
+                />
+              )}
             {sale.debtCharged > 0 && (
               <Line
                 label="Added to account"
@@ -197,15 +217,18 @@ function Line({
   label,
   value,
   strong = false,
+  indent = false,
 }: {
   label: string;
   value: string;
   /** For the figure the customer is meant to leave remembering. */
   strong?: boolean;
+  /** A part of the line above it, such as one method of a split payment. */
+  indent?: boolean;
 }) {
   return (
     <div className={cn("flex justify-between gap-1.5", strong && "font-bold")}>
-      <span className="shrink-0">{label}</span>
+      <span className={cn("shrink-0", indent && "pl-3")}>{label}</span>
       <span className="break-words text-right">{value}</span>
     </div>
   );

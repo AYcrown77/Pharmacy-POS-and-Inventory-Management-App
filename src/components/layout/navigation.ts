@@ -14,6 +14,7 @@ import {
   Settings,
   SlidersHorizontal,
   Users,
+  Wallet,
   Warehouse,
   type LucideIcon,
 } from "lucide-react";
@@ -55,6 +56,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/sales", label: "Sales", icon: Receipt, permission: "sales:read:own" },
       { href: "/returns", label: "Returns", icon: RotateCcw, permission: "sales:refund" },
       { href: "/customers", label: "Customers", icon: Users2, permission: "customers:manage" },
+      { href: "/expenses", label: "Expenses", icon: Wallet, permission: "expenses:record" },
     ],
   },
   {
@@ -100,6 +102,8 @@ const ROUTE_TITLES: ReadonlyArray<readonly [string, string]> = [
   ["/expiry", "Expiry Management"],
   ["/sales", "Sales"],
   ["/returns", "Returns"],
+  ["/customers", "Customers"],
+  ["/expenses", "Expenses"],
   ["/reports/sales", "Sales Report"],
   ["/reports/inventory", "Inventory Report"],
   ["/reports/expiry", "Expiry Report"],

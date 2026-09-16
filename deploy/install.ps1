@@ -75,6 +75,16 @@ powercfg /change hibernate-timeout-ac 0 | Out-Null
 powercfg /change disk-timeout-ac 0 | Out-Null
 Write-Host "  this PC will no longer sleep while plugged in"
 
+# Closing the lid would otherwise sleep the machine — and every till in the
+# shop goes blank with it. (Power button GUID, then lid-action GUID, 0 = do
+# nothing; set for both mains and battery so a power cut does not end the day.)
+$buttons = "4f971e89-eebd-4455-a8de-9e59040e7347"
+$lidAction = "5ca83367-6e45-459f-a27b-476b1d01c936"
+powercfg /setacvalueindex SCHEME_CURRENT $buttons $lidAction 0 | Out-Null
+powercfg /setdcvalueindex SCHEME_CURRENT $buttons $lidAction 0 | Out-Null
+powercfg /setactive SCHEME_CURRENT | Out-Null
+Write-Host "  closing the lid no longer sends it to sleep"
+
 Write-Host "`n== Starting" -ForegroundColor Cyan
 Start-ScheduledTask -TaskName $apiTask
 Start-ScheduledTask -TaskName $posTask

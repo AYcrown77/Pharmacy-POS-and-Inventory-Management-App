@@ -30,6 +30,8 @@ export type Permission =
   // Back office
   | "reports:read"
   | "customers:manage"
+  | "expenses:record"
+  | "expenses:void"
   | "users:manage"
   | "audit:read"
   | "settings:manage";
@@ -59,6 +61,8 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "stock:adjust",
     "reports:read",
     "customers:manage",
+    "expenses:record",
+    "expenses:void",
     "users:manage",
     "audit:read",
     "settings:manage",
@@ -70,6 +74,9 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "products:read",
     // A cashier attaches accounts and takes repayments at the counter.
     "customers:manage",
+    // ...and pays for things out of the drawer. Voiding an entry, which
+    // changes a day's figures, stays with an administrator.
+    "expenses:record",
   ],
 };
 
@@ -132,6 +139,7 @@ const ROUTE_PERMISSIONS: ReadonlyArray<readonly [string, Permission]> = [
   ["/returns", "sales:refund"],
   ["/reports", "reports:read"],
   ["/customers", "customers:manage"],
+  ["/expenses", "expenses:record"],
   ["/users", "users:manage"],
   ["/audit", "audit:read"],
   ["/settings", "settings:manage"],

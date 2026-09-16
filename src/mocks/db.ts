@@ -682,12 +682,14 @@ export interface CompleteSaleLine {
 export interface CompleteSaleInput {
   lines: CompleteSaleLine[];
   discount: Money;
-  paymentMethod: PaymentMethod;
+  /** Every method used and how much by each; older callers send one method. */
+  payments?: { method: PaymentMethod; amount: Money }[];
+  paymentMethod?: PaymentMethod;
   /** Which price list to charge. Defaults to the walk-in consumer price. */
   priceTier?: PriceTier;
   /** Attaching an account lets an underpayment become debt. */
   customerId?: string | null;
-  amountReceived: Money | null;
+  amountReceived?: Money | null;
   cashierId: string;
   terminalId: string;
 }
@@ -781,14 +783,22 @@ export function completeSale(input: CompleteSaleInput): Sale {
   const subtotal = items.reduce((sum, item) => sum + item.subtotal, 0);
   const total = Math.max(subtotal - input.discount, 0);
 
-  if (input.paymentMethod === "CASH" && input.amountReceived !== null) {
-    if (input.amountReceived < total) {
-      throw new MockApiError(
-        400,
-        "The amount received is less than the total due.",
-        "INSUFFICIENT_PAYMENT",
-      );
-    }
+  // The mock has no accounts to put a shortfall on, so every sale is paid in
+  // full — by one method or several.
+  const tenders = input.payments?.length
+    ? input.payments
+    : [{ method: input.paymentMethod ?? "CASH", amount: input.amountReceived ?? total }];
+  const received = tenders.reduce((sum, tender) => sum + tender.amount, 0);
+  const methodsUsed = [
+    ...new Set(tenders.filter((tender) => tender.amount > 0).map((tender) => tender.method)),
+  ];
+
+  if (received < total) {
+    throw new MockApiError(
+      400,
+      "The amount received is less than the total due.",
+      "INSUFFICIENT_PAYMENT",
+    );
   }
 
   db.receiptSequence += 1;
@@ -803,18 +813,15 @@ export function completeSale(input: CompleteSaleInput): Sale {
     subtotal,
     discount: input.discount,
     total,
-    paymentMethod: input.paymentMethod,
+    paymentMethod: methodsUsed.length > 1 ? "SPLIT" : (methodsUsed[0] ?? "CASH"),
     priceTier: input.priceTier ?? "CONSUMER",
     customerId: null,
     customerName: null,
     debtCharged: 0,
     debtRepaid: 0,
     customerBalanceAfter: null,
-    amountReceived: input.amountReceived,
-    changeGiven:
-      input.paymentMethod === "CASH" && input.amountReceived !== null
-        ? input.amountReceived - total
-        : null,
+    amountReceived: received,
+    changeGiven: received - total,
     status: "COMPLETED",
     items,
     createdAt,

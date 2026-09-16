@@ -5,13 +5,15 @@ import { formatQuantity } from "@/lib/money";
 import {
   AUDIT_ACTION_LABELS,
   AUDIT_ACTION_TONES,
+  EXPENSE_STATUS_LABELS,
+  EXPENSE_STATUS_TONES,
   EXPIRY_STATUS_LABELS,
   EXPIRY_STATUS_TONES,
   MOVEMENT_TYPE_LABELS,
   MOVEMENT_TYPE_TONES,
-  PAYMENT_METHOD_SHORT_LABELS,
   ROLE_LABELS,
   ROLE_TONES,
+  SALE_PAYMENT_METHOD_SHORT_LABELS,
   SALE_STATUS_LABELS,
   SALE_STATUS_TONES,
   STOCK_STATUS_LABELS,
@@ -19,10 +21,11 @@ import {
 } from "@/lib/status";
 import type {
   AuditAction,
+  ExpenseStatus,
   ExpiryStatus,
   MovementType,
-  PaymentMethod,
   Role,
+  SalePaymentMethod,
   SaleStatus,
   StockStatus,
 } from "@/types/domain";
@@ -123,12 +126,12 @@ export function PaymentMethodBadge({
   method,
   size = "md",
 }: {
-  method: PaymentMethod;
+  method: SalePaymentMethod;
   size?: "sm" | "md";
 }) {
   return (
-    <Badge tone="neutral" size={size}>
-      {PAYMENT_METHOD_SHORT_LABELS[method]}
+    <Badge tone={method === "SPLIT" ? "info" : "neutral"} size={size}>
+      {SALE_PAYMENT_METHOD_SHORT_LABELS[method]}
     </Badge>
   );
 }
@@ -177,5 +180,19 @@ export function QuantityDelta({
       {isPositive ? "+" : "−"}
       {formatQuantity(Math.abs(value))}
     </span>
+  );
+}
+
+export function ExpenseStatusBadge({
+  status,
+  size = "md",
+}: {
+  status: ExpenseStatus;
+  size?: "sm" | "md";
+}) {
+  return (
+    <Badge tone={EXPENSE_STATUS_TONES[status]} size={size}>
+      {EXPENSE_STATUS_LABELS[status]}
+    </Badge>
   );
 }

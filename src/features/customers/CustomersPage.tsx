@@ -15,11 +15,11 @@ import { useToast } from "@/components/ui/Toast";
 import { useTableState } from "@/hooks/useTableState";
 import { toErrorMessage } from "@/lib/api/http";
 import { cn } from "@/lib/cn";
-import { formatDate } from "@/lib/date";
-import { formatMoney } from "@/lib/money";
+import { formatRelativeTime } from "@/lib/date";
+import { formatMoney, formatQuantity } from "@/lib/money";
 import { customersService } from "@/services/customers.service";
 import type { Customer } from "@/types/domain";
-import { CustomerLedgerDrawer } from "./components/CustomerLedgerDrawer";
+import { CustomerDrawer } from "./components/CustomerDrawer";
 import { RepaymentModal } from "./components/RepaymentModal";
 
 interface CustomerFilters extends Record<string, unknown> {
@@ -27,11 +27,12 @@ interface CustomerFilters extends Record<string, unknown> {
 }
 
 /**
- * Accounts and what they owe.
+ * Accounts: what each owes, and how each buys.
  *
- * The list leads with the balance rather than the name, because the question
- * this page is opened to answer is almost always "who owes us money" — not
- * "who are our customers".
+ * Balance still sits beside the name — "who owes us money" is the question
+ * this page is most often opened for — but spending, visits and the last
+ * purchase now sit next to it, and every one of them sorts across the whole
+ * book, so the pharmacy's best customers are one click away.
  */
 export function CustomersPage() {
   const { toast } = useToast();
@@ -94,7 +95,8 @@ export function CustomersPage() {
       {
         id: "name",
         header: "Customer",
-        width: "34%",
+        width: "25%",
+        sortable: true,
         cell: (customer) => (
           <PrimaryCell title={customer.name} subtitle={customer.phone ?? "No phone number"} />
         ),
@@ -103,7 +105,8 @@ export function CustomersPage() {
         id: "balance",
         header: "Balance",
         align: "right",
-        width: "20%",
+        width: "14%",
+        sortable: true,
         cell: (customer) => (
           <NumericCell
             className={cn(
@@ -124,24 +127,48 @@ export function CustomersPage() {
         ),
       },
       {
-        id: "createdAt",
-        header: "Customer since",
-        width: "20%",
+        id: "totalSpent",
+        header: "Total spent",
+        align: "right",
+        width: "14%",
+        sortable: true,
+        cell: (customer) => (
+          <NumericCell className="font-medium">
+            {formatMoney(customer.totalSpent ?? 0)}
+          </NumericCell>
+        ),
+      },
+      {
+        id: "purchaseCount",
+        header: "Purchases",
+        align: "right",
+        width: "10%",
+        sortable: true,
         hideBelow: "lg",
         cell: (customer) => (
-          <span className="num whitespace-nowrap text-neutral-600">
-            {formatDate(customer.createdAt.slice(0, 10))}
+          <NumericCell muted>{formatQuantity(customer.purchaseCount ?? 0)}</NumericCell>
+        ),
+      },
+      {
+        id: "lastPurchaseAt",
+        header: "Last purchase",
+        width: "14%",
+        sortable: true,
+        hideBelow: "lg",
+        cell: (customer) => (
+          <span className="whitespace-nowrap text-neutral-600">
+            {customer.lastPurchaseAt ? formatRelativeTime(customer.lastPurchaseAt) : "Never"}
           </span>
         ),
       },
       {
         id: "actions",
         header: "",
-        width: "26%",
+        width: "23%",
         cell: (customer) => (
           <div className="flex justify-end gap-1.5">
             <Button size="sm" variant="ghost" onClick={() => setViewing(customer)}>
-              Statement
+              Details
             </Button>
             <Button
               size="sm"
@@ -163,7 +190,7 @@ export function CustomersPage() {
     <PageContainer>
       <PageHeader
         title="Customers"
-        description="Accounts that buy on credit, and what each of them owes."
+        description="Accounts: what each one owes, and how each one buys."
       />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -201,11 +228,13 @@ export function CustomersPage() {
         isLoading={list.isPending}
         isError={list.isError}
         onRetry={() => void list.refetch()}
+        sort={table.sort}
+        onSortChange={table.setSort}
         empty={
           <EmptyState
             icon={<Users2 className="size-5" />}
             title="No customer accounts yet"
-            description="Accounts are created at the till when a customer buys on credit."
+            description="Accounts are created at the till when a customer is attached to a sale."
           />
         }
       />
@@ -219,7 +248,8 @@ export function CustomersPage() {
         onPageSizeChange={table.setPageSize}
       />
 
-      <CustomerLedgerDrawer
+      <CustomerDrawer
+        key={viewing?.id ?? "none"}
         customer={viewing}
         open={Boolean(viewing)}
         onOpenChange={(open: boolean) => !open && setViewing(null)}
