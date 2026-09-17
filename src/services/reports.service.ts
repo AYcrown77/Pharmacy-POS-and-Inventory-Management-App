@@ -110,8 +110,13 @@ const mockReportsService: ReportsService = {
           0,
         ),
         refundCount: refunds.length,
-        creditSales: sales.reduce((total, sale) => total + sale.debtCharged, 0),
+        // Mock sales are all walk-ins, so no debt moves.
+        returnedSalesTotal: 0,
+        creditSales: 0,
         debtCollected: 0,
+        debtCleared: 0,
+        refundsPaidOut: refunds.reduce((total, entry) => total + entry.refundAmount, 0),
+        debtActivity: { taken: [], paid: [], cleared: [] },
         expenses: { total: 0, count: 0, byCategory: [] },
         netSales:
           grossSales -

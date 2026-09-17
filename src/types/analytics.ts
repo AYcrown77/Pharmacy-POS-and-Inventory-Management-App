@@ -120,13 +120,28 @@ export interface SalesReportSummary {
   /** Refunds recorded in the same period, shown against gross takings. */
   refundedAmount: Money;
   refundCount: number;
-  /** Goods handed over on account: inside gross sales, not yet paid for. */
+  /**
+   * Sales rung up on these dates and since fully returned: left out of gross
+   * sales, but added back in the takings sum because their refunds count.
+   */
+  returnedSalesTotal: Money;
+  /** Debt taken: goods handed over on account on these dates, not yet paid for. */
   creditSales: Money;
-  /** Money in against older debts — not a sale, but in the drawer. */
+  /** Debt paid back: money in against earlier debts — not a sale, but in the drawer. */
   debtCollected: Money;
+  /** Returned goods that cleared debt rather than being paid out. */
+  debtCleared: Money;
+  /** Refunds handed back as money: returns less the debt they cleared. */
+  refundsPaidOut: Money;
+  /** Every entry behind the debt figures, newest first. */
+  debtActivity: DebtActivity;
   /** Recorded (not voided) expenses on the same days. */
   expenses: ExpenseSummary;
-  /** Gross sales, less refunds, less expenses. */
+  /**
+   * What the period actually brought in: gross sales, plus sales since fully
+   * returned, less debt taken, plus debt paid back, less refunds paid out, less
+   * expenses — each counted on the date it happened.
+   */
   netSales: Money;
 }
 
@@ -226,4 +241,42 @@ export interface CustomerInsights {
   /** The last six months, oldest first, quiet months included. */
   monthly: CustomerMonthSpend[];
   recentSales: CustomerRecentSale[];
+}
+
+/* -------------------------------------------------------------------------
+   Customer debt in a period
+   ------------------------------------------------------------------------- */
+
+/** One sale that put goods on a customer's account. */
+export interface DebtTakenEntry {
+  saleId: string;
+  receiptNumber: string;
+  customerId: string | null;
+  customerName: string | null;
+  amount: Money;
+  recordedBy: string;
+  /** REVERSED when the goods have since all come back. */
+  status: SaleStatus;
+  createdAt: Timestamp;
+}
+
+/** Money paid back, or debt cleared by a return. */
+export interface DebtLedgerMovement {
+  entryId: string;
+  customerId: string;
+  customerName: string;
+  /** Always positive. */
+  amount: Money;
+  /** The sale it happened with: a surplus at the till, or a return. */
+  saleId: string | null;
+  receiptNumber: string | null;
+  recordedBy: string;
+  reason: string | null;
+  createdAt: Timestamp;
+}
+
+export interface DebtActivity {
+  taken: DebtTakenEntry[];
+  paid: DebtLedgerMovement[];
+  cleared: DebtLedgerMovement[];
 }

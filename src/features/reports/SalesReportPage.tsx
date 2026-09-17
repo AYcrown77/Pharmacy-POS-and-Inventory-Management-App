@@ -24,6 +24,7 @@ import { useAuth } from "@/lib/auth/AuthProvider";
 import { cn } from "@/lib/cn";
 import {
   formatDate,
+  formatDateTime,
   formatTime,
   resolveDateRange,
   timestampToDateOnly,
@@ -251,14 +252,25 @@ export function SalesReportPage() {
     >
       {summary.data && <Reconciliation summary={summary.data} />}
 
+      {summary.data && <DebtActivityCard summary={summary.data} />}
+
       {summary.data && summary.data.refundedAmount > 0 && (
         <p className="text-meta text-neutral-500">
           {formatQuantity(summary.data.refundCount)}{" "}
           {summary.data.refundCount === 1 ? "return was" : "returns were"}{" "}
-          recorded in this period, refunding{" "}
+          recorded in this period, worth{" "}
           <span className="num font-semibold text-neutral-700">
             {formatMoney(summary.data.refundedAmount)}
           </span>
+          {summary.data.debtCleared > 0 && (
+            <>
+              {" "}— of which{" "}
+              <span className="num font-semibold text-neutral-700">
+                {formatMoney(summary.data.debtCleared)}
+              </span>{" "}
+              cleared customer debt instead of being paid out
+            </>
+          )}
           . Fully reversed sales are excluded from gross sales above.
         </p>
       )}
@@ -312,54 +324,70 @@ export function SalesReportPage() {
 }
 
 /**
- * The day-end sum: what was sold, less what went back out.
+ * The day-end sum: the money the selected dates actually brought in.
  *
- * Refunds and expenses are money out of the business in the period, so they
- * come off. Credit sales and debt collected are shown beside the sum rather
- * than in it: neither changes what was earned, only when the money arrives.
+ * Gross sales count goods the moment they leave, paid for or not. So what was
+ * taken on account comes off, and what customers paid back against earlier
+ * debt goes on — that money is in the drawer even though it is not a sale.
+ * Refunds count only what was handed back as money: a return on goods bought
+ * on account clears the debt first, and that part never left the drawer.
  */
 function Reconciliation({ summary }: { summary: SalesReportSummary }) {
   return (
     <Card>
       <CardHeader
-        title="Takings after expenses"
-        description="Gross sales, less refunds and the expenses recorded for the same days."
+        title="Takings after debt and expenses"
+        description="What the selected dates actually brought in: sales, less debt taken, plus debt paid back, less refunds and expenses."
       />
       <CardBody className="grid gap-6 lg:grid-cols-2">
-        <div className="flex flex-col gap-2">
-          <dl className="flex flex-col gap-2">
-            <Sum label="Gross sales" value={summary.grossSales} strong />
-            <Sum label="Refunds" value={-summary.refundedAmount} />
+        <dl className="flex flex-col gap-2.5">
+          <Sum label="Gross sales" value={summary.grossSales} strong />
+          {summary.returnedSalesTotal > 0 && (
             <Sum
-              label={`Expenses (${formatQuantity(summary.expenses.count)})`}
-              value={-summary.expenses.total}
+              label="Sales since fully returned"
+              hint="Rung up on these dates; their refunds are below"
+              value={summary.returnedSalesTotal}
+              signed
             />
-            <div className="flex items-baseline justify-between gap-3 border-t border-neutral-200 pt-2">
-              <dt className="text-base font-semibold text-neutral-900">
-                Net takings
-              </dt>
-              <dd
-                className={cn(
-                  "num text-title font-bold tabular-nums",
-                  summary.netSales < 0 ? "text-danger-700" : "text-neutral-900",
-                )}
-              >
-                {formatMoney(summary.netSales)}
-              </dd>
-            </div>
-          </dl>
-          <p className="text-meta text-neutral-500">
-            Of gross sales,{" "}
-            <span className="num font-medium text-neutral-700">
-              {formatMoney(summary.creditSales)}
-            </span>{" "}
-            was taken on account and is not yet paid.{" "}
-            <span className="num font-medium text-neutral-700">
-              {formatMoney(summary.debtCollected)}
-            </span>{" "}
-            came in against older debts — money in the drawer, but not a sale.
-          </p>
-        </div>
+          )}
+          <Sum
+            label="Debt taken"
+            hint="Goods sold on account, not yet paid for"
+            value={-summary.creditSales}
+          />
+          <Sum
+            label="Debt paid back"
+            hint="Money received against earlier debts"
+            value={summary.debtCollected}
+            signed
+          />
+          <Sum
+            label="Refunds paid out"
+            hint={
+              summary.debtCleared > 0
+                ? `${formatMoney(summary.debtCleared)} of returned goods cleared debt instead`
+                : undefined
+            }
+            value={-summary.refundsPaidOut}
+          />
+          <Sum
+            label={`Expenses (${formatQuantity(summary.expenses.count)})`}
+            value={-summary.expenses.total}
+          />
+          <div className="flex items-baseline justify-between gap-3 border-t border-neutral-200 pt-2.5">
+            <dt className="text-base font-semibold text-neutral-900">
+              Net takings
+            </dt>
+            <dd
+              className={cn(
+                "num text-title font-bold tabular-nums",
+                summary.netSales < 0 ? "text-danger-700" : "text-neutral-900",
+              )}
+            >
+              {formatMoney(summary.netSales)}
+            </dd>
+          </div>
+        </dl>
 
         <div>
           <div className="flex items-center justify-between gap-2">
@@ -405,24 +433,195 @@ function Reconciliation({ summary }: { summary: SalesReportSummary }) {
 
 function Sum({
   label,
+  hint,
   value,
   strong = false,
+  signed = false,
 }: {
   label: string;
+  hint?: string;
   value: number;
   strong?: boolean;
+  /** Show a + on a positive amount that is added to the sum. */
+  signed?: boolean;
 }) {
+  const text =
+    value < 0
+      ? `− ${formatMoney(-value)}`
+      : signed && value > 0
+        ? `+ ${formatMoney(value)}`
+        : formatMoney(value);
+
   return (
     <div className="flex items-baseline justify-between gap-3">
-      <dt className="text-base text-neutral-600">{label}</dt>
+      <dt className="min-w-0">
+        <span
+          className={cn(
+            "block text-base",
+            strong ? "font-medium text-neutral-800" : "text-neutral-600",
+          )}
+        >
+          {label}
+        </span>
+        {hint && <span className="block text-meta text-neutral-400">{hint}</span>}
+      </dt>
       <dd
         className={cn(
-          "num text-base tabular-nums",
+          "num shrink-0 text-base tabular-nums",
           strong ? "font-semibold text-neutral-900" : "text-neutral-700",
         )}
       >
-        {value < 0 ? `− ${formatMoney(-value)}` : formatMoney(value)}
+        {text}
       </dd>
     </div>
+  );
+}
+
+/**
+ * Every debt movement behind the debt lines above, for the chosen dates: who
+ * took goods on account, who paid back and how, and returns that cleared debt.
+ * Each row links to its receipt, so a figure can be traced to a customer.
+ */
+function DebtActivityCard({ summary }: { summary: SalesReportSummary }) {
+  const { taken, paid, cleared } = summary.debtActivity;
+  const movements = taken.length + paid.length + cleared.length;
+  // How much more (or less) customers owe than before these dates.
+  const change = summary.creditSales - summary.debtCollected - summary.debtCleared;
+
+  return (
+    <Card>
+      <CardHeader
+        title="Customer debt on these dates"
+        description={
+          movements === 0
+            ? "No goods were taken on account and no debt was paid back."
+            : change === 0
+              ? "What customers owe did not change overall."
+              : `What customers owe ${change > 0 ? "went up" : "went down"} by ${formatMoney(Math.abs(change))} overall.`
+        }
+      />
+      {movements > 0 && (
+        <CardBody
+          className={cn(
+            "grid gap-6",
+            cleared.length > 0 ? "lg:grid-cols-3" : "lg:grid-cols-2",
+          )}
+        >
+          <DebtList
+            title="Debt taken"
+            total={summary.creditSales}
+            tone="danger"
+            empty="Nobody took goods on account."
+            entries={taken.map((entry) => ({
+              id: entry.saleId,
+              customer: entry.customerName ?? "Customer",
+              detail: `${entry.receiptNumber}${entry.status === "REVERSED" ? " (since returned)" : ""} · ${formatDateTime(entry.createdAt)} · ${entry.recordedBy}`,
+              amount: entry.amount,
+              href: `/sales/${entry.saleId}`,
+            }))}
+          />
+          <DebtList
+            title="Debt paid back"
+            total={summary.debtCollected}
+            tone="success"
+            empty="No debt was paid back."
+            entries={paid.map((entry) => ({
+              id: entry.entryId,
+              customer: entry.customerName,
+              detail: `${entry.receiptNumber ? `With sale ${entry.receiptNumber}` : "Paid on account"} · ${formatDateTime(entry.createdAt)} · ${entry.recordedBy}`,
+              amount: entry.amount,
+              href: entry.saleId ? `/sales/${entry.saleId}` : undefined,
+            }))}
+          />
+          {cleared.length > 0 && (
+            <DebtList
+              title="Cleared by returns"
+              total={summary.debtCleared}
+              tone="neutral"
+              empty=""
+              entries={cleared.map((entry) => ({
+                id: entry.entryId,
+                customer: entry.customerName,
+                detail: `Returned from ${entry.receiptNumber ?? "a sale"} · ${formatDateTime(entry.createdAt)} · ${entry.recordedBy}`,
+                amount: entry.amount,
+                href: entry.saleId ? `/sales/${entry.saleId}` : undefined,
+              }))}
+            />
+          )}
+        </CardBody>
+      )}
+    </Card>
+  );
+}
+
+function DebtList({
+  title,
+  total,
+  tone,
+  entries,
+  empty,
+}: {
+  title: string;
+  total: number;
+  tone: "danger" | "success" | "neutral";
+  entries: Array<{
+    id: string;
+    customer: string;
+    detail: string;
+    amount: number;
+    href?: string;
+  }>;
+  empty: string;
+}) {
+  return (
+    <section className="min-w-0">
+      <div className="flex items-baseline justify-between gap-2 border-b border-neutral-200 pb-1.5">
+        <h3 className="text-micro font-semibold uppercase tracking-wide text-neutral-500">
+          {title} · {formatQuantity(entries.length)}
+        </h3>
+        <span
+          className={cn(
+            "num text-base font-semibold tabular-nums",
+            tone === "danger"
+              ? "text-danger-700"
+              : tone === "success"
+                ? "text-success-700"
+                : "text-neutral-700",
+          )}
+        >
+          {formatMoney(total)}
+        </span>
+      </div>
+      {entries.length === 0 ? (
+        <p className="mt-2 text-meta text-neutral-500">{empty}</p>
+      ) : (
+        <ul className="divide-y divide-neutral-100">
+          {entries.map((entry) => (
+            <li key={entry.id} className="flex items-start justify-between gap-3 py-2">
+              <span className="min-w-0">
+                <span className="block truncate text-base font-medium text-neutral-900">
+                  {entry.customer}
+                </span>
+                {entry.href ? (
+                  <Link
+                    href={entry.href}
+                    className="block truncate text-meta text-primary-700 hover:underline"
+                  >
+                    {entry.detail}
+                  </Link>
+                ) : (
+                  <span className="block truncate text-meta text-neutral-500">
+                    {entry.detail}
+                  </span>
+                )}
+              </span>
+              <span className="num shrink-0 text-base tabular-nums text-neutral-900">
+                {formatMoney(entry.amount)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
