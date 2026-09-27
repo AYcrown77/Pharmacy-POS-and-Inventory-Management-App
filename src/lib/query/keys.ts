@@ -118,6 +118,7 @@ export const settingsKeys = {
   all: ["settings"] as const,
   pharmacy: () => [...settingsKeys.all, "pharmacy"] as const,
   terminals: () => [...settingsKeys.all, "terminals"] as const,
+  backups: () => [...settingsKeys.all, "backups"] as const,
 };
 
 export const healthKeys = {

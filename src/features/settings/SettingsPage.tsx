@@ -27,6 +27,8 @@ import { auditKeys, settingsKeys } from "@/lib/query/keys";
 import { TERMINAL_TYPE_LABELS } from "@/lib/status";
 import { systemService } from "@/services/system.service";
 
+import { BackupCard } from "./components/BackupCard";
+
 const settingsSchema = z.object({
   name: z.string().trim().min(2, "Enter the pharmacy name").max(120),
   address: z.string().trim().min(4, "Enter the pharmacy address").max(200),
@@ -160,6 +162,8 @@ export function SettingsPage() {
               </FormField>
             </CardBody>
           </Card>
+
+          <BackupCard />
 
           <Card>
             <CardHeader title="System" />
