@@ -1,7 +1,7 @@
 <#
     Runs the pharmacy API. Started by the "Mustan Pharmacy API" task at boot.
 
-    Everything else it needs — database credentials, port — comes from
+    Everything else it needs - database credentials, port - comes from
     mutaan-backend\.env, so this sets only what the service itself decides.
 #>
 param(

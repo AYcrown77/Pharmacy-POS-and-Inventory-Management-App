@@ -2,8 +2,8 @@
     Builds both apps for production. Run this once at setup, and again after
     every `git pull`.
 
-    The API's port is baked into the platform's build — Next resolves the
-    /api proxy at build time — so the two .env files are checked against each
+    The API's port is baked into the platform's build - Next resolves the
+    /api proxy at build time - so the two .env files are checked against each
     other before anything is built.
 #>
 param(
@@ -25,7 +25,7 @@ $BackendDir = Resolve-BackendDir -Hint $BackendDir -AppDir $AppDir
 
     So: the installed pnpm if it actually works; otherwise the exact version
     the project pins, fetched on demand by npx; and only if neither can run,
-    npm — which then needs node_modules deleted first.
+    npm - which then needs node_modules deleted first.
 #>
 function Get-PackageManager {
     param([string]$Dir)
@@ -34,7 +34,7 @@ function Get-PackageManager {
     if (-not (Test-Path (Join-Path $Dir "pnpm-lock.yaml"))) { return $npm }
 
     # That a `pnpm` command exists proves only that a shim is on the PATH. A
-    # half-installed pnpm — its shim pointing back at itself — answers just the
+    # half-installed pnpm - its shim pointing back at itself - answers just the
     # same and then fails every command. cmd runs it, because PowerShell 5.1
     # turns a native command's stderr into errors that would stop the script.
     if (Get-Command pnpm -ErrorAction SilentlyContinue) {
@@ -146,7 +146,7 @@ Write-Host "  using $($appPm.Name)"
 Push-Location $AppDir
 try {
     # A dev server writes its own route types under .next\dev and leaves them
-    # half-written if it is ever killed — which then fails the production type
+    # half-written if it is ever killed - which then fails the production type
     # check, because tsconfig includes them. They are dev-only output.
     $devOutput = Join-Path $AppDir ".next\dev"
     if (Test-Path $devOutput) {

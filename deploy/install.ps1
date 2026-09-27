@@ -4,8 +4,8 @@
 
         powershell -ExecutionPolicy Bypass -File .\deploy\install.ps1
 
-    Afterwards both apps start themselves whenever the PC is switched on — no
-    terminal, no npm, nobody logged in — and restart on their own if they stop.
+    Afterwards both apps start themselves whenever the PC is switched on - no
+    terminal, no npm, nobody logged in - and restart on their own if they stop.
 #>
 #Requires -RunAsAdministrator
 param(
@@ -13,13 +13,38 @@ param(
     [int]$Port = 80,
     # Only needed when the API folder cannot be found automatically.
     [string]$BackendDir,
-    [switch]$NoBackup
+    [switch]$NoBackup,
+    # Where every backup is copied as soon as it is taken - a USB stick left in
+    # this PC (-MirrorTo E:\MustanBackups) or a shared folder on another
+    # laptop. More than one is fine: -MirrorTo E:\MustanBackups, D:\Backups
+    [string[]]$MirrorTo = @(),
+    # Backups run every hour between these two, and once more at the end of the
+    # trading day. Losing an hour of sales is recoverable from the receipts;
+    # losing a day is not.
+    [int]$BackupFromHour = 7,
+    [int]$BackupToHour = 23
 )
 
 $ErrorActionPreference = "Stop"
 $apiTask = "Mustan Pharmacy API"
 $posTask = "Mustan Pharmacy POS"
 $backupTask = "Mustan Pharmacy Backup"
+$checkTask = "Mustan Pharmacy Backup Check"
+
+# Installing over a platform that is already running is normal - it is how a
+# new setting, a new port or a new backup schedule arrives. Stop ours first, so
+# the port check below is about something else holding the port, not about us.
+# Everything is started again at the end.
+foreach ($name in $posTask, $apiTask) {
+    if (Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue) {
+        Stop-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue
+        Write-Host "stopping $name to re-install it"
+    }
+}
+Get-CimInstance Win32_Process -Filter "Name = 'node.exe'" |
+    Where-Object { $_.CommandLine -match "bin.next.+start|dist.index.js" } |
+    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+Start-Sleep -Seconds 2
 
 $inUse = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue |
     Where-Object { $_.OwningProcess -ne 0 }
@@ -46,19 +71,89 @@ function Install-AppTask {
     Write-Host "  installed: $Name"
 }
 
+<#
+    Builds one "-Name value" pair for a scheduled task's command line.
+
+    Two traps, both silent: a path ending in a backslash escapes the closing
+    quote and swallows whatever follows it, and a comma-separated list handed
+    to powershell.exe -File arrives as a single string rather than a list. So
+    trailing backslashes go, and several values travel separated by semicolons
+    for the receiving script to split.
+#>
+function Format-ScriptArgument {
+    param([string]$Name, [string[]]$Values)
+
+    $clean = @($Values | Where-Object { $_ } | ForEach-Object { $_.Trim().TrimEnd("\") } | Where-Object { $_ })
+    if ($clean.Count -eq 0) { return "" }
+    return (" -{0} `"{1}`"" -f $Name, ($clean -join ";"))
+}
+
 Write-Host "`n== Services" -ForegroundColor Cyan
-$apiArguments = if ($BackendDir) { "-BackendDir `"$BackendDir`"" } else { "" }
+$apiArguments = (Format-ScriptArgument -Name "BackendDir" -Values $BackendDir).Trim()
 Install-AppTask -Name $apiTask -Script (Join-Path $PSScriptRoot "start-backend.ps1") -Arguments $apiArguments
 Install-AppTask -Name $posTask -Script (Join-Path $PSScriptRoot "start-frontend.ps1") -Arguments "-Port $Port"
 
 if (-not $NoBackup) {
-    $backupAction = New-ScheduledTaskAction -Execute "powershell.exe" `
-        -Argument ("-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"{0}`" {1}" -f (Join-Path $PSScriptRoot "backup-db.ps1"), $apiArguments).Trim()
-    $backupTrigger = New-ScheduledTaskTrigger -Daily -At "10:00pm"
+    Write-Host "`n== Backups" -ForegroundColor Cyan
     $backupPrincipal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+    # StartWhenAvailable: a PC switched off at 1pm still takes the 1pm backup
+    # when it comes back, instead of skipping that hour silently.
+    $backupSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+        -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Hours 1)
+
+    $mirrorArguments = Format-ScriptArgument -Name "MirrorTo" -Values $MirrorTo
+    $backupAction = New-ScheduledTaskAction -Execute "powershell.exe" `
+        -Argument ("-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"{0}`" {1}{2}" -f (Join-Path $PSScriptRoot "backup-db.ps1"), $apiArguments, $mirrorArguments).Trim()
+
+    # Every hour through the trading day, not once at night: a laptop that dies
+    # at 4pm should cost the shop an hour of sales, not the whole day.
+    #
+    # It has to be a *daily* trigger carrying an hourly repetition. A one-off
+    # trigger with the same repetition runs for one day and then never again -
+    # backups would stop the day after install, silently.
+    $hours = [Math]::Max($BackupToHour - $BackupFromHour, 1)
+    $startAt = [datetime]::Today.AddHours($BackupFromHour)
+    $backupTrigger = New-ScheduledTaskTrigger -Daily -At $startAt
+    $backupTrigger.Repetition = (New-ScheduledTaskTrigger -Once -At $startAt `
+        -RepetitionInterval (New-TimeSpan -Hours 1) -RepetitionDuration (New-TimeSpan -Hours $hours)).Repetition
     Register-ScheduledTask -TaskName $backupTask -Action $backupAction -Trigger $backupTrigger `
-        -Principal $backupPrincipal -Force | Out-Null
-    Write-Host "  installed: $backupTask (nightly at 10pm)"
+        -Principal $backupPrincipal -Settings $backupSettings -Force | Out-Null
+    Write-Host ("  installed: {0} (every hour, {1}:00 to {2}:00)" -f $backupTask, $BackupFromHour, $BackupToHour)
+
+    if ($MirrorTo.Count -gt 0) {
+        Write-Host ("  every backup is also copied to: {0}" -f ($MirrorTo -join ", "))
+    } else {
+        Write-Host "  WARNING: no second copy. Every backup will sit on this PC only." -ForegroundColor Yellow
+        Write-Host "           Leave a USB stick in this PC and re-run with -MirrorTo E:\MustanBackups" -ForegroundColor Yellow
+    }
+
+    # Weekly: proves the newest backup can actually be restored, into a scratch
+    # database that is thrown away afterwards.
+    $checkAction = New-ScheduledTaskAction -Execute "powershell.exe" `
+        -Argument ("-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"{0}`" {1}" -f (Join-Path $PSScriptRoot "verify-restore.ps1"), $apiArguments).Trim()
+    $checkTrigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Sunday -At "11:30pm"
+    Register-ScheduledTask -TaskName $checkTask -Action $checkAction -Trigger $checkTrigger `
+        -Principal $backupPrincipal -Settings $backupSettings -Force | Out-Null
+    Write-Host "  installed: $checkTask (Sundays at 11:30pm)"
+
+    # One double-click for the weekly copy that leaves the building.
+    try {
+        $desktop = [Environment]::GetFolderPath("CommonDesktopDirectory")
+        $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $desktop "Copy Mustan backups to USB.lnk"))
+        $shortcut.TargetPath = "powershell.exe"
+        $shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -NoExit -File `"{0}`"" -f (Join-Path $PSScriptRoot "copy-backups.ps1")
+        $shortcut.WorkingDirectory = Split-Path $PSScriptRoot -Parent
+        $shortcut.Description = "Copy the pharmacy backups onto a USB stick to take home"
+        $shortcut.Save()
+        Write-Host "  desktop shortcut: Copy Mustan backups to USB"
+    } catch {
+        Write-Host "  (could not create the desktop shortcut: $($_.Exception.Message))" -ForegroundColor Yellow
+    }
+
+    # One now, so there is a backup before the shop opens rather than after the
+    # first hour of trading.
+    Write-Host "  taking a first backup now..."
+    Start-ScheduledTask -TaskName $backupTask
 }
 
 Write-Host "`n== Firewall" -ForegroundColor Cyan
@@ -75,7 +170,7 @@ powercfg /change hibernate-timeout-ac 0 | Out-Null
 powercfg /change disk-timeout-ac 0 | Out-Null
 Write-Host "  this PC will no longer sleep while plugged in"
 
-# Closing the lid would otherwise sleep the machine — and every till in the
+# Closing the lid would otherwise sleep the machine - and every till in the
 # shop goes blank with it. (Power button GUID, then lid-action GUID, 0 = do
 # nothing; set for both mains and battery so a power cut does not end the day.)
 $buttons = "4f971e89-eebd-4455-a8de-9e59040e7347"
@@ -97,4 +192,5 @@ Get-NetIPAddress -AddressFamily IPv4 |
     Where-Object { $_.IPAddress -notlike "127.*" -and $_.IPAddress -notlike "169.254.*" } |
     ForEach-Object { Write-Host "  http://$($_.IPAddress)$suffix/" }
 
-Write-Host "`nCheck it any time with: powershell -ExecutionPolicy Bypass -File .\deploy\status.ps1`n"
+Write-Host "`nCheck it any time with: powershell -ExecutionPolicy Bypass -File .\deploy\status.ps1"
+Write-Host "Check the backups with:  powershell -ExecutionPolicy Bypass -File .\deploy\check-backups.ps1`n"

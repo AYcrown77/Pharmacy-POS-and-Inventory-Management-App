@@ -1,5 +1,5 @@
 <#
-    Is the platform up? Run any time — no Administrator needed.
+    Is the platform up? Run any time - no Administrator needed.
 
         powershell -ExecutionPolicy Bypass -File .\deploy\status.ps1
 #>
@@ -8,7 +8,7 @@ param([int]$Port = 80)
 $ErrorActionPreference = "Continue"
 
 Write-Host "`n== Services" -ForegroundColor Cyan
-foreach ($name in "Mustan Pharmacy API", "Mustan Pharmacy POS", "Mustan Pharmacy Backup") {
+foreach ($name in "Mustan Pharmacy API", "Mustan Pharmacy POS", "Mustan Pharmacy Backup", "Mustan Pharmacy Backup Check") {
     $task = Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue
     if (-not $task) { Write-Host "  $name : NOT INSTALLED" -ForegroundColor Yellow; continue }
     $info = Get-ScheduledTaskInfo -TaskName $name
@@ -46,5 +46,9 @@ if (Test-Path $logDir) {
     Write-Host "  no logs yet"
 }
 
+# The backups are the part nobody notices until the day they matter, so the
+# health check runs here too rather than waiting to be remembered.
+& (Join-Path $PSScriptRoot "check-backups.ps1") | Out-Host
+
 $suffix = if ($Port -eq 80) { "" } else { ":$Port" }
-Write-Host "`nTills open: http://$env:COMPUTERNAME$suffix/`n"
+Write-Host "Tills open: http://$env:COMPUTERNAME$suffix/`n"

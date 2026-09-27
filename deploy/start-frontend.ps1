@@ -32,7 +32,7 @@ $err = Join-Path $logDir "pos-$stamp.err.log"
 $env:NODE_ENV = "production"
 
 $node = (Get-Command node).Source
-# -H 0.0.0.0 binds every network card, so the tills can reach it — not just
+# -H 0.0.0.0 binds every network card, so the tills can reach it - not just
 # this PC. Next's own entry point is run directly: no npm wrapper process
 # between the service and the server it is supposed to be watching.
 $process = Start-Process -FilePath $node `

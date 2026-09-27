@@ -83,11 +83,18 @@ and checks the two `.env` files agree on the API's port.
 - opens the firewall for the platform's port only — the API's own port stays
   closed, since the tills reach it through the platform;
 - stops the PC sleeping while it is plugged in;
-- schedules a nightly database backup at 10pm;
+- schedules the backups (see [section 5](#5-backups)) and takes one immediately;
 - prints the address the tills should use.
 
 Port 80 is the default, so the staff type no port number at all. If something
 else on that PC already uses port 80, install with `-Port 3000` instead.
+
+Leave a USB stick in the PC and name it when installing, so every backup lands
+on a second disk straight away:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\deploy\install.ps1 -MirrorTo E:\MustanBackups
+```
 
 ---
 
@@ -112,25 +119,86 @@ Nothing. Switch the PC on and the platform is up within a few seconds.
 | I want to… | Command (PowerShell, in `mustaan-frontend`) |
 |---|---|
 | check it is running | `powershell -ExecutionPolicy Bypass -File .\deploy\status.ps1` |
+| check the backups are healthy | `powershell -ExecutionPolicy Bypass -File .\deploy\check-backups.ps1` |
 | apply an update after `git pull` | `powershell -ExecutionPolicy Bypass -File .\deploy\update.ps1` *(as Administrator)* |
 | back up right now | `powershell -ExecutionPolicy Bypass -File .\deploy\backup-db.ps1` |
+| copy backups to a USB stick | double-click **Copy Mustan backups to USB** on the desktop |
+| put a backup back | `powershell -ExecutionPolicy Bypass -File .\deploy\restore-db.ps1` *(as Administrator)* |
 | stop it running automatically | `powershell -ExecutionPolicy Bypass -File .\deploy\uninstall.ps1` *(as Administrator)* |
 
-Backups land in `deploy\backups` and are kept for 30 days. **Copy them off the
-PC** — a flash drive or an external disk, weekly. A backup on the same machine
-does not survive that machine dying.
-
-Restoring one:
-
-```powershell
-& "C:\Program Files\PostgreSQL\18\bin\pg_restore.exe" -U postgres -d mustan_pharmacy --clean deploy\backups\<file>.dump
-```
-
-Logs are in `deploy\logs`, one file per start, kept for 14 days.
+Logs are in `deploy\logs`, one file per start, kept for 14 days. The backups
+write to `deploy\logs\backup.log`.
 
 ---
 
-## 5. Things worth knowing
+## 5. Backups
+
+Everything the shop owns — every sale, every batch, every debt — is in one
+database on one PC. A dropped laptop, a stolen one, or a disk that stops
+answering would take the lot. So:
+
+**Three copies, two disks, one of them off the premises.** That is the whole
+idea; the rest is just the routine that keeps it true.
+
+| Copy | Where | How often | Set up by |
+|---|---|---|---|
+| 1 | `deploy\backups` on the server PC | every hour, 7am–11pm | `install.ps1` |
+| 2 | a USB stick left in the server PC | with every backup | `install.ps1 -MirrorTo E:\MustanBackups` |
+| 3 | a second stick kept away from the shop | weekly | the desktop shortcut |
+
+Backups are small (a couple of MB), and taking one never interrupts a sale.
+Old ones are thinned automatically: every backup from the last 3 days, then one
+a day for a month, then one a month for a year. A mistake noticed on Monday can
+still be undone from Friday's copy.
+
+**What the shop does, weekly.** Plug in the take-home stick, double-click
+**Copy Mustan backups to USB** on the desktop, wait for the green line, take
+the stick home. Two sticks, alternating, means one is always out of the
+building. Keep them somewhere private: a backup holds customer names, debts and
+staff accounts.
+
+**Is it working?** `check-backups.ps1` answers in three lines — when the last
+good backup ran, whether a copy exists off this PC, and when a backup was last
+proved restorable. `status.ps1` prints it too. Anything wrong is red, with the
+fix underneath.
+
+**Proving it works.** Every Sunday night, the PC restores its newest backup
+into a scratch database, counts the rows, and throws the scratch database away.
+The live data is never touched. A backup that cannot be restored is worth
+nothing, and this is how that gets noticed in a week rather than on the day it
+is needed. To run it by hand:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\deploy\verify-restore.ps1
+```
+
+**Putting a backup back.** As Administrator:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\deploy\restore-db.ps1
+```
+
+It offers the newest backup, or name another with `-File E:\MustanBackups\….dump`.
+It checks the file reads correctly, saves what is currently in the database
+first (so a restore started by mistake can itself be undone), stops the
+platform, restores, and starts it again. Everything recorded after the backup
+was taken is gone — which is why the backups run hourly rather than nightly.
+
+**If the server PC dies completely.** On the replacement PC: install Node.js
+and PostgreSQL, clone the repos, fill in `mutaan-backend\.env`, run `build.ps1`,
+then `restore-db.ps1 -File <the newest dump from the stick>`, then `install.ps1`.
+The receipts in the drawer cover whatever happened after the last backup.
+
+> Keep the database password and `SECRET_KEY` written down somewhere safe and
+> away from the shop. Without them a backup can still be restored, but the
+> app cannot be brought back up without setting them again.
+
+Product images are the one thing not in the backup — they live at Cloudinary,
+not on the PC.
+
+---
+
+## 6. Things worth knowing
 
 - **Do not open the API's port in the firewall.** The tills only need the
   platform's port; the API answers it locally.

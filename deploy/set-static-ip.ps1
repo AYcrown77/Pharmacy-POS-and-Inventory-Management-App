@@ -6,7 +6,7 @@
 
     The gateway, subnet and network card are taken from the current connection,
     so only the address itself has to be chosen. Pick one OUTSIDE the range the
-    router hands out automatically (its DHCP pool — often .100 to .199), or the
+    router hands out automatically (its DHCP pool - often .100 to .199), or the
     router may later give the same address to a phone and both will drop off.
 
     If the laptop is ever taken to another network, put it back first:
