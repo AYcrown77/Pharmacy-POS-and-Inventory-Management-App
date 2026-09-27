@@ -209,8 +209,10 @@ function Remove-OldBackups {
         [int]$MonthlyMonths = 12
     )
 
+    # "pre-" files are the copies taken just before a restore or a reset. They
+    # are not part of the schedule and must not be thinned away with it.
     $files = @(Get-ChildItem $Dir -Filter "*.dump" -ErrorAction SilentlyContinue |
-        Where-Object { $_.Name -notlike "pre-restore-*" })
+        Where-Object { $_.Name -notlike "pre-*" })
     if ($files.Count -eq 0) { return 0 }
 
     $now = Get-Date
@@ -237,9 +239,8 @@ function Remove-OldBackups {
         }
     }
 
-    # Safety copies taken just before a restore are not part of the schedule
-    # above, but they should not pile up for ever either.
-    Get-ChildItem $Dir -Filter "pre-restore-*.dump" -ErrorAction SilentlyContinue |
+    # Those safety copies should not pile up for ever either.
+    Get-ChildItem $Dir -Filter "pre-*.dump" -ErrorAction SilentlyContinue |
         Where-Object { $_.LastWriteTime -lt $now.AddDays(-90) } |
         ForEach-Object { Remove-Item $_.FullName -Force -ErrorAction SilentlyContinue; $removed++ }
 

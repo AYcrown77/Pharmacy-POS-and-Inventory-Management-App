@@ -8,7 +8,8 @@ param([int]$Port = 80)
 $ErrorActionPreference = "Continue"
 
 Write-Host "`n== Services" -ForegroundColor Cyan
-foreach ($name in "Mustan Pharmacy API", "Mustan Pharmacy POS", "Mustan Pharmacy Backup", "Mustan Pharmacy Backup Check") {
+foreach ($name in "Mustan Pharmacy API", "Mustan Pharmacy POS", "Mustan Pharmacy Backup",
+    "Mustan Pharmacy Backup Check", "Mustan Pharmacy Backup Offsite") {
     $task = Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue
     if (-not $task) { Write-Host "  $name : NOT INSTALLED" -ForegroundColor Yellow; continue }
     $info = Get-ScheduledTaskInfo -TaskName $name

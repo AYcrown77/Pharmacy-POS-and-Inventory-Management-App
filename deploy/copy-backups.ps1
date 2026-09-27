@@ -60,7 +60,29 @@ foreach ($file in $files) {
 
 $onStick = @(Get-ChildItem $target -Filter "*.dump")
 $size = ($onStick | Measure-Object -Property Length -Sum).Sum
+
+# Recorded where check-backups.ps1 reads it, so "is there a copy off this PC?"
+# has an answer whether that copy goes to a stick or to a folder that syncs.
+$status = Read-BackupStatus -OutDir $OutDir
+$status = Set-StatusValue -Status $status -Name "offsite" -Value @{
+    target = $target
+    lastCopiedAt = (Get-Date).ToString("s")
+    backupCount = $onStick.Count
+}
+Save-BackupStatus -OutDir $OutDir -Status $status
+# The same script serves the stick somebody carries home and the folder that
+# syncs itself every evening, so the closing line has to match which one it is.
+$root = [System.IO.Path]::GetPathRoot($target)
+$isStick = @(Get-CimInstance Win32_LogicalDisk -Filter "DriveType = 2" |
+    Where-Object { $root -like "$($_.DeviceID)*" }).Count -gt 0
+
+$summary = "copied {0} new backup(s), {1} already there; {2} now holds {3} backups ({4:N0} MB)" -f `
+    $copied, $skipped, $target, $onStick.Count, ($size / 1MB)
+"{0}  offsite: {1}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"), $summary |
+    Add-Content -Path (Join-Path $PSScriptRoot "logs\backup.log") -Encoding utf8
+
 Write-Host ""
 Write-Host ("Copied {0} new backup(s); {1} were already there." -f $copied, $skipped) -ForegroundColor Green
-Write-Host ("The stick now holds {0} backups ({1:N0} MB), newest {2}." -f $onStick.Count, ($size / 1MB), ($onStick | Sort-Object LastWriteTime -Descending | Select-Object -First 1).LastWriteTime)
-Write-Host "Eject the stick and keep it away from the shop.`n"
+Write-Host ("{0} now holds {1} backups ({2:N0} MB), newest {3}." -f $target, $onStick.Count, ($size / 1MB), ($onStick | Sort-Object LastWriteTime -Descending | Select-Object -First 1).LastWriteTime)
+if ($isStick) { Write-Host "Eject the stick and keep it away from the shop.`n" }
+else { Write-Host "That folder syncs itself off this PC - leave the PC signed in so it can.`n" }

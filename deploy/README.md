@@ -144,18 +144,26 @@ idea; the rest is just the routine that keeps it true.
 |---|---|---|---|
 | 1 | `deploy\backups` on the server PC | every hour, 7am–11pm | `install.ps1` |
 | 2 | a USB stick left in the server PC | with every backup | `install.ps1 -MirrorTo E:\MustanBackups` |
-| 3 | a second stick kept away from the shop | weekly | the desktop shortcut |
+| 3 | a folder that syncs itself (OneDrive, Google Drive) | 10:15pm daily | `install.ps1 -CloudFolder "C:\Users\<name>\OneDrive"` |
+
+Both at once, which is the setup to aim for:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\deploy\install.ps1 -MirrorTo E:\MustanBackups -CloudFolder "C:\Users\musta\OneDrive"
+```
+
+The stick covers the disk dying and needs no internet. The synced folder covers
+fire and theft with nobody having to remember anything — about 2 MB a day, and
+it uploads only while the PC is signed in. If the shop would rather its data did
+not leave the building at all, leave `-CloudFolder` out and carry a second stick
+home weekly instead: plug it in, double-click **Copy Mustan backups to USB** on
+the desktop, wait for the green line, take it home. Either way, keep it
+somewhere private — a backup holds customer names, debts and staff accounts.
 
 Backups are small (a couple of MB), and taking one never interrupts a sale.
 Old ones are thinned automatically: every backup from the last 3 days, then one
 a day for a month, then one a month for a year. A mistake noticed on Monday can
 still be undone from Friday's copy.
-
-**What the shop does, weekly.** Plug in the take-home stick, double-click
-**Copy Mustan backups to USB** on the desktop, wait for the green line, take
-the stick home. Two sticks, alternating, means one is always out of the
-building. Keep them somewhere private: a backup holds customer names, debts and
-staff accounts.
 
 **Is it working?** `check-backups.ps1` answers in three lines — when the last
 good backup ran, whether a copy exists off this PC, and when a backup was last
@@ -198,7 +206,46 @@ not on the PC.
 
 ---
 
-## 6. The router was changed (or the tills stopped loading)
+## 6. Handing the shop a clean system
+
+Everything entered while the platform was being built is still in the database.
+Before the shop starts trading for real, empty it:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\deploy\reset-data.ps1
+```
+
+as Administrator. It lists what will go, names the accounts it keeps and the
+ones it deletes, and asks you to type `ERASE`. Then it takes a full backup to
+`deploy\backups\pre-reset-….dump`, stops the platform, empties every table
+except the administrator accounts, the terminals and the pharmacy's settings,
+restarts the platform, and restarts receipt numbers at `MHP-000001`.
+
+Then, in the app:
+
+1. sign in as the administrator and **change that password**;
+2. create an account for each member of staff (Users);
+3. put the pharmacy's name, address and phone in **Settings** - they print on
+   every receipt;
+4. add the products. Typing a new category name on the product form creates
+   that category, so there is nothing to set up first;
+5. receive the real stock, then print the shelf labels.
+
+Finally, prove the shop is ready:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\deploy\network-check.ps1
+powershell -ExecutionPolicy Bypass -File .\deploy\backup-db.ps1
+powershell -ExecutionPolicy Bypass -File .\deploy\check-backups.ps1
+```
+
+Keep that `pre-reset` dump somewhere safe for a few weeks - it is the only copy
+of everything from before the handover, and it holds test customer data, so it
+does not belong on a shared drive.
+
+---
+
+## 7. The router was changed (or the tills stopped loading)
 
 A new router is a new network, and three things from the old one are left
 behind. None of them is the platform: it never stores an address.
@@ -251,7 +298,7 @@ Use the range the new router actually uses - `network-check.ps1` prints it as
 
 ---
 
-## 7. Things worth knowing
+## 8. Things worth knowing
 
 - **Do not open the API's port in the firewall.** The tills only need the
   platform's port; the API answers it locally.

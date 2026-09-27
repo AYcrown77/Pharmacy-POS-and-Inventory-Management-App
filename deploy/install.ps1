@@ -18,6 +18,12 @@ param(
     # this PC (-MirrorTo E:\MustanBackups) or a shared folder on another
     # laptop. More than one is fine: -MirrorTo E:\MustanBackups, D:\Backups
     [string[]]$MirrorTo = @(),
+    # A folder that syncs itself off this PC - a OneDrive or Google Drive
+    # folder. One copy a day goes there, in the evening, which is a couple of
+    # MB of data and puts a copy outside the building without anyone
+    # remembering to do anything:
+    #   -CloudFolder "C:\Users\musta\OneDrive"
+    [string]$CloudFolder,
     # Backups run every hour between these two, and once more at the end of the
     # trading day. Losing an hour of sales is recoverable from the receipts;
     # losing a day is not.
@@ -30,6 +36,7 @@ $apiTask = "Mustan Pharmacy API"
 $posTask = "Mustan Pharmacy POS"
 $backupTask = "Mustan Pharmacy Backup"
 $checkTask = "Mustan Pharmacy Backup Check"
+$cloudTask = "Mustan Pharmacy Backup Offsite"
 
 # Installing over a platform that is already running is normal - it is how a
 # new setting, a new port or a new backup schedule arrives. Stop ours first, so
@@ -125,6 +132,24 @@ if (-not $NoBackup) {
     } else {
         Write-Host "  WARNING: no second copy. Every backup will sit on this PC only." -ForegroundColor Yellow
         Write-Host "           Leave a USB stick in this PC and re-run with -MirrorTo E:\MustanBackups" -ForegroundColor Yellow
+    }
+
+    if ($CloudFolder) {
+        # Once a day rather than hourly: the folder syncs over the shop's
+        # internet, and an hourly upload would spend data all day for a copy
+        # the USB stick already holds. The copy skips files already there, so
+        # it is a couple of MB each evening.
+        $cloudAction = New-ScheduledTaskAction -Execute "powershell.exe" `
+            -Argument ("-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"{0}`"{1}" -f `
+                (Join-Path $PSScriptRoot "copy-backups.ps1"), (Format-ScriptArgument -Name "To" -Values $CloudFolder))
+        $cloudTrigger = New-ScheduledTaskTrigger -Daily -At "10:15pm"
+        Register-ScheduledTask -TaskName $cloudTask -Action $cloudAction -Trigger $cloudTrigger `
+            -Principal $backupPrincipal -Settings $backupSettings -Force | Out-Null
+        Write-Host ("  installed: {0} (10:15pm, into {1}\MustanBackups)" -f $cloudTask, $CloudFolder.TrimEnd("\"))
+        Write-Host "  that folder must be one that syncs by itself, and this PC left signed in"
+    } elseif (Get-ScheduledTask -TaskName $cloudTask -ErrorAction SilentlyContinue) {
+        Unregister-ScheduledTask -TaskName $cloudTask -Confirm:$false
+        Write-Host "  removed: $cloudTask (no -CloudFolder given this time)"
     }
 
     # Weekly: proves the newest backup can actually be restored, into a scratch

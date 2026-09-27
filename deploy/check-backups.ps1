@@ -11,7 +11,9 @@ param(
     [string]$OutDir = (Join-Path $PSScriptRoot "backups"),
     # A day's trading is the most anyone should be willing to lose.
     [int]$MaxAgeHours = 24,
-    [int]$MaxDrillDays = 14
+    [int]$MaxDrillDays = 14,
+    # A week, plus a day's grace for a late Sunday.
+    [int]$MaxOffsiteDays = 8
 )
 
 $ErrorActionPreference = "Continue"
@@ -66,6 +68,23 @@ if ($mirrors.Count -eq 0) {
             Write-Host "  fix: is the USB stick still in the PC, or the other laptop on and shared?"
             $problems += "the copy to $($entry.path) is not working"
         }
+    }
+}
+
+Write-Host "`n== Copy away from the shop" -ForegroundColor Cyan
+if (-not $status.offsite) {
+    Write-Host "  none yet - a fire or a theft takes this PC and the stick in it" -ForegroundColor Yellow
+    Write-Host "  fix: double-click 'Copy Mustan backups to USB' with the take-home stick in,"
+    Write-Host "       or install with -CloudFolder so a copy syncs itself every evening"
+    $problems += "no copy has left the building"
+} else {
+    $offsiteAge = (Get-Date) - [datetime]$status.offsite.lastCopiedAt
+    $line = "  {0}  {1} backups, last copied {2}" -f $status.offsite.target, $status.offsite.backupCount, (Format-Age $status.offsite.lastCopiedAt)
+    if ($offsiteAge.TotalDays -gt $MaxOffsiteDays) {
+        Write-Host "$line - OVERDUE" -ForegroundColor Red
+        $problems += "the copy away from the shop is $([int]$offsiteAge.TotalDays) days old"
+    } else {
+        Write-Host $line -ForegroundColor Green
     }
 }
 

@@ -28,7 +28,7 @@ $psql = Get-PgTool -Name "psql"
 
 if (-not $File) {
     $newest = Get-ChildItem $OutDir -Filter "*.dump" -ErrorAction SilentlyContinue |
-        Where-Object { $_.Name -notlike "pre-restore-*" } |
+        Where-Object { $_.Name -notlike "pre-*" } |
         Sort-Object LastWriteTime -Descending | Select-Object -First 1
     if (-not $newest) { throw "No backups found in $OutDir." }
     $File = $newest.FullName

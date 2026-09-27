@@ -7,7 +7,8 @@ param([int]$Port = 80)
 
 $ErrorActionPreference = "Continue"
 
-foreach ($name in "Mustan Pharmacy POS", "Mustan Pharmacy API", "Mustan Pharmacy Backup", "Mustan Pharmacy Backup Check") {
+foreach ($name in "Mustan Pharmacy POS", "Mustan Pharmacy API", "Mustan Pharmacy Backup",
+    "Mustan Pharmacy Backup Check", "Mustan Pharmacy Backup Offsite") {
     if (Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue) {
         Stop-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue
         Unregister-ScheduledTask -TaskName $name -Confirm:$false
