@@ -58,15 +58,18 @@ try {
     Write-Host @"
 
   Work through these, in order:
-   1. This PC is on the same Wi-Fi (or cable) as the server - the same router,
+   1. Check the address above is where the server actually is NOW. The router
+      remembers names from earlier, so a lookup can answer with an address the
+      server used last week. ON THE SERVER run ipconfig, then come back here:
+        powershell -ExecutionPolicy Bypass -File .\connect-till.ps1 -ServerAddress <that address>
+   2. This PC is on the same Wi-Fi (or cable) as the server - the same router,
       and not its guest network. Run ipconfig here: all but the last number of
       this PC's address should match the server's.
-   2. ON THE SERVER, the network must be Private, not Public:
-        Get-NetConnectionProfile
-        Set-NetConnectionProfile -InterfaceAlias "Wi-Fi" -NetworkCategory Private
-      A Public network blocks other PCs from connecting at all.
-   3. ON THE SERVER, the firewall must allow port 80 - deploy\install.ps1 adds
-      that rule, so re-run it if it was skipped.
+   3. ON THE SERVER, one command checks the rest of this and puts it right:
+        powershell -ExecutionPolicy Bypass -File .\deploy\network-check.ps1 -Fix
+      It covers the two usual causes: Windows treating the new network as
+      Public (which blocks other PCs outright), and the firewall rule for
+      port 80 being missing.
 "@ -ForegroundColor Yellow
     return
 }
