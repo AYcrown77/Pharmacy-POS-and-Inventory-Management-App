@@ -198,7 +198,60 @@ not on the PC.
 
 ---
 
-## 6. Things worth knowing
+## 6. The router was changed (or the tills stopped loading)
+
+A new router is a new network, and three things from the old one are left
+behind. None of them is the platform: it never stores an address.
+
+1. **The fixed address belongs to the old router.** If the old one handed out
+   `192.168.1.x` and the new one hands out `192.168.8.x`, the server PC is
+   still answering on an address nobody can reach - and it shows "No internet"
+   for the same reason.
+2. **Windows calls the new network Public**, and a Public network refuses every
+   other PC. This alone stops the tills loading.
+3. **Each till wrote the old address down** in its hosts file, so `http://mustan/`
+   still points at a machine that no longer exists.
+
+On the server PC, as Administrator:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\deploy\network-check.ps1        # look
+powershell -ExecutionPolicy Bypass -File .\deploy\network-check.ps1 -Fix   # put right
+```
+
+It puts the card back on automatic so the new router gives it an address,
+makes the network Private, restores the firewall rule, starts anything that
+stopped, and finishes by printing the address to use - and the exact command to
+run on each till.
+
+Then on **each till**, as Administrator:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\connect-till.ps1
+```
+
+With no address it now asks the network for the server by name and rewrites the
+old entry itself. Give it `-ServerAddress <address from the server>` if the name
+cannot be found.
+
+Once it all works again, either reserve the server's new address in the new
+router, or fix it in the **new** range:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\deploy\set-static-ip.ps1 -IPAddress 192.168.8.10
+```
+
+Use the range the new router actually uses - `network-check.ps1` prints it as
+"router:". Setting an address from the old range is what caused the outage.
+
+> If the tills still cannot reach the server after all this, look in the
+> router's own settings for **AP isolation** (sometimes "client isolation").
+> Mobile-network routers often ship with it on, and it stops devices on the
+> same Wi-Fi from seeing each other at all. Turn it off.
+
+---
+
+## 7. Things worth knowing
 
 - **Do not open the API's port in the firewall.** The tills only need the
   platform's port; the API answers it locally.

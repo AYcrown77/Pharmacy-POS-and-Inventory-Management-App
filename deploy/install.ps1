@@ -164,6 +164,19 @@ New-NetFirewallRule -DisplayName $ruleName -Direction Inbound -Action Allow `
 Write-Host "  allowed inbound TCP $Port on private networks"
 Write-Host "  (the API's own port stays closed: the tills reach it through this one)"
 
+# Windows calls every network it has not seen before Public, and a Public
+# network refuses the tills before they ever reach the platform. Changing the
+# shop's router is enough to bring this back, so it is set here and checked by
+# network-check.ps1.
+$connection = Get-NetConnectionProfile -ErrorAction SilentlyContinue |
+    Where-Object { $_.IPv4Connectivity -ne "Disconnected" } | Select-Object -First 1
+if ($connection -and $connection.NetworkCategory -eq "Public") {
+    Set-NetConnectionProfile -InterfaceIndex $connection.InterfaceIndex -NetworkCategory Private
+    Write-Host ("  network '{0}' changed from Public to Private" -f $connection.Name)
+} elseif ($connection) {
+    Write-Host ("  network '{0}' is {1}" -f $connection.Name, $connection.NetworkCategory)
+}
+
 Write-Host "`n== Power" -ForegroundColor Cyan
 powercfg /change standby-timeout-ac 0 | Out-Null
 powercfg /change hibernate-timeout-ac 0 | Out-Null

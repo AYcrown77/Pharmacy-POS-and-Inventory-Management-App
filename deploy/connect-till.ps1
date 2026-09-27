@@ -9,7 +9,10 @@
 #>
 #Requires -RunAsAdministrator
 param(
-    [string]$ServerAddress = "192.168.1.10",
+    # Left out, this asks the network for the server by name. Give the address
+    # when the shop's router has changed and this till still holds the old one:
+    #   -ServerAddress 192.168.8.10
+    [string]$ServerAddress,
     [string]$ServerName = "mustan",
     [ValidateSet("pos", "dashboard")]
     [string]$Page = "pos",
@@ -17,6 +20,34 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+# No address given: ask the network where the server is. Windows finds other
+# machines by name on the same network, and a name cannot go stale the way the
+# address written into this till's hosts file does when the router changes.
+if (-not $ServerAddress) {
+    Write-Host "`n== Looking for '$ServerName' on this network" -ForegroundColor Cyan
+    # A stale hosts entry would answer this lookup with the old address, so it
+    # is ignored here: only what the network itself says counts.
+    $hostsFile = "$env:SystemRoot\System32\drivers\etc\hosts"
+    $stale = @(Get-Content $hostsFile -ErrorAction SilentlyContinue | Where-Object { $_ -match "\s$ServerName\s*$" })
+    if ($stale.Count -gt 0) {
+        Set-Content -Path $hostsFile -Encoding ascii -Value @(
+            Get-Content $hostsFile | Where-Object { $_ -notmatch "\s$ServerName\s*$" })
+        Write-Host ("  ignoring what this till had written down: {0}" -f ($stale -join "; "))
+    }
+
+    $found = Resolve-DnsName -Name $ServerName -Type A -ErrorAction SilentlyContinue |
+        Where-Object { $_.IPAddress } | Select-Object -First 1
+    if ($found) {
+        $ServerAddress = $found.IPAddress
+        Write-Host "  found at $ServerAddress" -ForegroundColor Green
+    } else {
+        Write-Host "  not found by name." -ForegroundColor Yellow
+        Write-Host "  On the server PC run deploy\network-check.ps1 - it prints the address to use here:"
+        Write-Host "    powershell -ExecutionPolicy Bypass -File .\connect-till.ps1 -ServerAddress <that address>`n"
+        return
+    }
+}
 
 Write-Host "`n== Can this PC reach the server?" -ForegroundColor Cyan
 try {
@@ -27,8 +58,9 @@ try {
     Write-Host @"
 
   Work through these, in order:
-   1. This PC is on the same Wi-Fi (or cable) as the server. Run ipconfig here:
-      its address should start with 192.168.1
+   1. This PC is on the same Wi-Fi (or cable) as the server - the same router,
+      and not its guest network. Run ipconfig here: all but the last number of
+      this PC's address should match the server's.
    2. ON THE SERVER, the network must be Private, not Public:
         Get-NetConnectionProfile
         Set-NetConnectionProfile -InterfaceAlias "Wi-Fi" -NetworkCategory Private
